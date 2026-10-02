@@ -1,0 +1,342 @@
+.flow-chart-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  flex: 1;
+  min-height: 0;
+}
+
+.flow-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem;
+  background: rgba(61, 42, 49, 0.6);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.btn-add-node {
+  padding: 0.5rem 1rem;
+  border: none;
+  background: linear-gradient(135deg, var(--accent) 0%, #ff8fa8 100%);
+  color: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.btn-add-node:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 107, 138, 0.3);
+}
+
+.btn-add-node:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.flow-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.flow-canvas {
+  position: relative;
+  flex: 1;
+  min-height: 250px;
+  background: rgba(26, 18, 22, 0.6);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  overflow: auto;
+  cursor: default;
+}
+
+.flow-surface {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.flow-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 20px 20px;
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.flow-connections {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.flow-node {
+  position: absolute;
+  width: 140px;
+  height: 80px;
+  background: rgba(51, 34, 40, 0.95);
+  border: 3px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  user-select: none;
+  touch-action: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  z-index: 10;
+}
+
+.flow-node * {
+  pointer-events: none;
+}
+
+/* No scale transforms: they shift the hit area and make dragging jittery */
+.flow-node:hover {
+  border-color: var(--accent);
+}
+
+.flow-node.selected {
+  border-color: var(--accent);
+  border-width: 3px;
+  box-shadow: 0 0 25px rgba(255, 107, 138, 0.5);
+  z-index: 20;
+}
+
+.flow-node.dragging {
+  cursor: grabbing;
+  z-index: 30;
+}
+
+.flow-node.on {
+  border-color: var(--success);
+  background: linear-gradient(135deg, rgba(51, 34, 40, 0.95) 0%, rgba(93, 217, 163, 0.1) 100%);
+}
+
+.flow-node.on.selected {
+  box-shadow: 0 0 20px rgba(93, 217, 163, 0.3);
+}
+
+.flow-node.off {
+  border-color: var(--danger);
+  background: linear-gradient(135deg, rgba(51, 34, 40, 0.95) 0%, rgba(255, 107, 107, 0.1) 100%);
+}
+
+.flow-node.off.selected {
+  box-shadow: 0 0 20px rgba(255, 107, 107, 0.3);
+}
+
+.node-icon {
+  font-size: 1.5rem;
+}
+
+.node-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.node-device {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+  max-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.node-action {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+}
+
+.node-action.on {
+  background: rgba(93, 217, 163, 0.2);
+  color: var(--success);
+}
+
+.node-action.off {
+  background: rgba(255, 107, 107, 0.2);
+  color: var(--danger);
+}
+
+.node-delay {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0.2rem 0.4rem;
+  border-radius: 10px;
+}
+
+.node-delete {
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: var(--danger);
+  color: #fff;
+  font-size: 1rem;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+/* Only clickable while visible, so an invisible button can't delete a step */
+.flow-node:hover .node-delete,
+.flow-node.selected .node-delete {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.node-delete:hover {
+  transform: scale(1.1);
+}
+
+.flow-empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--text-muted);
+  font-size: 1rem;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* Properties Panel */
+.flow-properties {
+  flex-shrink: 0;
+  padding: 1rem;
+  background: rgba(61, 42, 49, 0.8);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1rem;
+  align-items: end;
+}
+
+.flow-properties.empty h4 {
+  color: var(--text-muted);
+}
+
+.prop-field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.flow-properties h4 {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--accent);
+}
+
+.flow-properties label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.flow-properties select,
+.flow-properties input {
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-main);
+  color: var(--text);
+  font-size: 0.9rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.flow-properties select:disabled,
+.flow-properties input:disabled,
+.action-toggle button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.flow-properties select:focus,
+.flow-properties input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.action-toggle {
+  display: flex;
+  gap: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.action-toggle button {
+  flex: 1;
+  padding: 0.5rem 1rem;
+  border: none;
+  background: var(--bg-main);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.action-toggle button:first-child {
+  border-right: 1px solid var(--border);
+}
+
+.action-toggle button.active.on {
+  background: var(--success);
+  color: #fff;
+}
+
+.action-toggle button.active.off {
+  background: var(--danger);
+  color: #fff;
+}
+
+.action-toggle button:hover:not(.active):not(:disabled) {
+  background: var(--bg-hover);
+}
+
+@media (max-width: 640px) {
+  .flow-canvas {
+    min-height: 300px;
+  }
+
+  .flow-properties {
+    grid-template-columns: 1fr;
+  }
+}

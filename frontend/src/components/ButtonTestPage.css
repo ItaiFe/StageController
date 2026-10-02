@@ -1,0 +1,207 @@
+.button-test-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.button-test-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--accent);
+}
+
+.button-test-warning {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.button-test-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(280px, 1.4fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.button-test-card {
+  background: rgba(51, 34, 40, 0.6);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.button-test-card h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text);
+}
+
+/* Virtual button: the ring fills (via --hold, 0..1) as a hold approaches a long press */
+.virtual-button-card {
+  align-items: center;
+  text-align: center;
+}
+
+.virtual-button {
+  --hold: 0;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: #fff;
+  background:
+    radial-gradient(circle, var(--accent) 0 60%, transparent 61%),
+    conic-gradient(var(--danger) calc(var(--hold) * 1turn), var(--border) 0);
+  box-shadow: 0 8px 30px var(--accent-glow);
+  transition: transform 0.08s, box-shadow 0.08s;
+  /* Touch: no scrolling, text selection or long-press menu while using the button */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.virtual-button.pressed {
+  transform: scale(0.96);
+  box-shadow: 0 3px 12px var(--accent-glow);
+}
+
+.virtual-button-status {
+  font-size: 1rem;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.gesture-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem 1rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.gesture-legend b {
+  color: var(--text);
+}
+
+.gesture-note {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Direct action buttons */
+.direct-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  gap: 0.6rem;
+}
+
+.direct-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.75rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-main);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.direct-action:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+}
+
+.direct-action.stop:hover {
+  border-color: var(--danger);
+}
+
+.direct-action-label {
+  font-weight: 600;
+}
+
+.direct-action-hint {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+/* Event log */
+.event-log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.clear-log {
+  padding: 0.25rem 0.75rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--bg-hover);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.event-log-empty {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.event-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.event-log-entry {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.45rem 0.75rem;
+  border-radius: 6px;
+  background: var(--bg-main);
+  font-size: 0.85rem;
+  border-left: 3px solid var(--border);
+}
+
+.event-log-entry.ok { border-left-color: var(--success); }
+.event-log-entry.error { border-left-color: var(--danger); }
+.event-log-entry.ignored { opacity: 0.6; }
+
+.event-time {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.event-action {
+  font-weight: 600;
+}
+
+.event-log-entry.ok .event-status { color: var(--success); }
+.event-log-entry.error .event-status { color: var(--danger); }
+
+@media (max-width: 720px) {
+  .button-test-grid {
+    grid-template-columns: 1fr;
+  }
+}

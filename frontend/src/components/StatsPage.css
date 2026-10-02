@@ -1,0 +1,166 @@
+.stats-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.stats-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.stats-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--accent);
+}
+
+.refresh-btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  background: var(--bg-hover);
+  color: var(--text);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.15s;
+}
+
+.refresh-btn:hover {
+  background: var(--accent-dim);
+}
+
+.stats-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+}
+
+.summary-card {
+  background: rgba(51, 34, 40, 0.6);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 1.25rem;
+  text-align: center;
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.summary-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.summary-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.summary-card.completed .summary-value {
+  color: var(--success);
+}
+
+.summary-card.skipped .summary-value {
+  color: var(--accent);
+}
+
+.summary-card.stopped .summary-value {
+  color: var(--danger);
+}
+
+.summary-card.rate .summary-value {
+  color: var(--success);
+}
+
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: rgba(51, 34, 40, 0.5);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.stats-table th,
+.stats-table td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.stats-table th {
+  background: rgba(61, 42, 49, 0.5);
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+
+.stats-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s;
+}
+
+.stats-table th.sortable:hover {
+  color: var(--accent);
+}
+
+.stats-table th.sortable.active {
+  color: var(--accent);
+}
+
+.stats-table tbody tr {
+  transition: background 0.15s;
+}
+
+.stats-table tbody tr:hover {
+  background: var(--bg-hover);
+}
+
+.song-title {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.song-artist {
+  color: var(--text-muted);
+}
+
+.stat-completed {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.stat-skipped {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.stat-stopped {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.stat-total {
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .stats-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stats-table th:nth-child(2),
+  .stats-table td:nth-child(2) {
+    display: none;
+  }
+}

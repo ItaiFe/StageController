@@ -264,6 +264,20 @@ export function StageEmulator() {
           <text x="150" y="245" textAnchor="middle" className="stage-label">entrance</text>
         </svg>
         {pillar('R')}
+        <aside className="press-guide" aria-label="Press guide">
+          <strong>Idle</strong>
+          <span>1 tap · solo</span>
+          <span>both {clicks('duet')}+{clicks('duet')} · duet</span>
+          <span>both {clicks('showoff')}+{clicks('showoff')} · showoff</span>
+          <span>both {clicks('thunder')}+{clicks('thunder')} · thunder</span>
+          <span>counts differ · fail blink</span>
+          <strong>In song</strong>
+          <span>2 taps · claps (thunder: dark pole)</span>
+          <span>3 taps · special</span>
+          <span>4 taps · skip (to mid verse 2)</span>
+          <span>1 tap · thunder tag (active pole)</span>
+          <span>hold · stop</span>
+        </aside>
       </div>
 
       {songId !== null && songMap?.songId === songId && player && (
@@ -279,6 +293,17 @@ export function StageEmulator() {
             ))}
             <button type="button" className="stop" onClick={() => send('L', 'long press', 'stop', LONG_PRESS_MS)}>Stop</button>
           </div>
+          {/* Both pillar buttons at the same instant: tap counts launch duet/showoff/thunder, hold stops */}
+          <button
+            type="button"
+            className={`emulator-both ${feedback.L.pressed && feedback.R.pressed ? 'pressed' : ''}`}
+            onPointerDown={e => { if (e.button === 0) { e.currentTarget.setPointerCapture(e.pointerId); SIDES.forEach(press); } }}
+            onPointerUp={() => SIDES.forEach(release)}
+            onPointerCancel={() => SIDES.forEach(release)}
+            onContextMenu={e => e.preventDefault()}
+          >
+            Both pressed
+          </button>
           <p className="emulator-note">{lastPress || 'Hold a pillar button to stop; tap it to launch.'}</p>
         </section>
 

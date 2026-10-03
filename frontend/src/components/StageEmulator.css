@@ -42,7 +42,24 @@
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 1.25rem;
+  position: relative;
 }
+
+.press-guide {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  max-width: 8.5rem;
+  font-size: 0.7rem;
+  line-height: 1.25;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.press-guide strong { color: var(--accent); margin-top: 0.3rem; }
 
 .emulator-tstage {
   width: min(440px, 50%);
@@ -134,6 +151,8 @@
 }
 
 .emulator-macros button.stop { border-color: var(--danger); color: var(--danger); }
+.emulator-both { margin-top: 0.5rem; width: 100%; padding: 0.6rem; touch-action: none; user-select: none; }
+.emulator-both.pressed { background: var(--accent); color: #fff; }
 .emulator-devices button.on { background: var(--accent-dim); border-color: var(--accent); }
 
 .emulator-note {

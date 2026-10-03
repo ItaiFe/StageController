@@ -56,6 +56,9 @@ async def startup():
     # Set main event loop for mpv callbacks
     set_main_loop(asyncio.get_event_loop())
 
+    from app.features.show.service import director
+    app.state.show_loop = asyncio.create_task(director.run())  # keep a reference so it is not collected
+
     # Set up music player callbacks
     async def on_song_end():
         """Called when a song ends naturally - record stat, stop playback, turn off devices."""
@@ -77,6 +80,9 @@ async def startup():
 
             # Turn off devices
             await end_show(db)
+
+            from app.features.show.service import director
+            await director.to_idle()
 
             # Broadcast state change
             from datetime import datetime

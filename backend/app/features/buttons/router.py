@@ -1,5 +1,5 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Literal
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -24,6 +24,10 @@ ButtonAction = Literal["start", "stop", "skip", "claps", "special"]
 class ButtonPress(BaseModel):
     action: ButtonAction
     timestamp: datetime | None = None
+    # Present = a side-aware pillar press, handled by the show director (docs/show-events-contract.md);
+    # absent = the legacy single-button path
+    side: Literal["L", "R"] | None = None
+    first_press_ago_ms: int = Field(default=0, ge=0)
 
 
 class ButtonEvent(BaseModel):
@@ -89,8 +93,8 @@ def play_random_claps(db: Session) -> dict | None:
     return {"id": song.id, "title": song.title, "artist": song.artist}
 
 
-async def handle_start_action(db: Session) -> dict:
-    """Start main sequence and main playlist, with a claps sound to open the show."""
+async def handle_start_action(db: Session, playlist_name: str = "main") -> dict:
+    """Start main sequence and a playlist ("main" unless a game asks for its own), with a claps sound to open the show."""
     result = {"sequence": None, "playlist": None, "overlay_song": None}
 
     # Find and execute "main" sequence
@@ -99,8 +103,8 @@ async def handle_start_action(db: Session) -> dict:
         seq_result = await execute_sequence(db, main_sequence.id)
         result["sequence"] = seq_result
 
-    # Find "main" playlist
-    main_playlist = db.query(Playlist).filter(Playlist.name.ilike("main")).first()
+    # Find the playlist
+    main_playlist = db.query(Playlist).filter(Playlist.name.ilike(playlist_name)).first()
     if main_playlist:
         # If currently playing, just resume
         if music_player.get_current_song_id() is not None:
@@ -230,42 +234,15 @@ def ignored_response(action: ButtonAction) -> dict:
     return {"status": "ignored", "action": action, "reason": "show_stopped"}
 
 
-@router.post("/press")
-async def button_press(data: ButtonPress, db: Session = Depends(get_db)):
-    """Receive a button press from external device (Pi GPIO, remote, etc.)"""
-    if not is_action_allowed(data.action, show_is_running()):
-        return ignored_response(data.action)
-
-    extras = await handle_action(data.action, db)
-
-    playlist_info = extras.get("playlist", {})
-    overlay_song = extras.get("overlay_song", {})
-    event = ButtonEvent(
-        action=data.action,
-        timestamp=data.timestamp or datetime.now(),
-        playlist_id=playlist_info.get("id") if playlist_info else None,
-        playlist_name=playlist_info.get("name") if playlist_info else None,
-        overlay_song_id=overlay_song.get("id") if overlay_song else None,
-    )
-
-    await manager.broadcast(event)
-
-    return {"status": "ok", "action": data.action, "timestamp": event.timestamp, **extras}
-
-
-@router.post("/press/{action}")
-async def button_press_simple(action: ButtonAction, db: Session = Depends(get_db)):
-    """Simple endpoint: POST /api/buttons/press/start"""
-    if not is_action_allowed(action, show_is_running()):
-        return ignored_response(action)
-
+async def perform(action: ButtonAction, db: Session, timestamp: datetime | None = None) -> dict:
+    """Run an action and tell the WebSocket clients about it."""
     extras = await handle_action(action, db)
 
     playlist_info = extras.get("playlist", {})
     overlay_song = extras.get("overlay_song", {})
     event = ButtonEvent(
         action=action,
-        timestamp=datetime.now(),
+        timestamp=timestamp or datetime.now(),
         playlist_id=playlist_info.get("id") if playlist_info else None,
         playlist_name=playlist_info.get("name") if playlist_info else None,
         overlay_song_id=overlay_song.get("id") if overlay_song else None,
@@ -274,6 +251,39 @@ async def button_press_simple(action: ButtonAction, db: Session = Depends(get_db
     await manager.broadcast(event)
 
     return {"status": "ok", "action": action, "timestamp": event.timestamp, **extras}
+
+
+async def end_game_on_stop(action: ButtonAction):
+    """A legacy stop also ends any game the show director is running."""
+    if action == "stop":
+        from app.features.show.service import director
+        await director.to_idle()
+
+
+@router.post("/press")
+async def button_press(data: ButtonPress, db: Session = Depends(get_db)):
+    """Receive a button press from external device (Pi GPIO, remote, etc.)"""
+    if data.side:
+        from app.features.show.service import director
+        return await director.on_press(data.action, data.side, data.first_press_ago_ms)
+
+    if not is_action_allowed(data.action, show_is_running()):
+        return ignored_response(data.action)
+
+    result = await perform(data.action, db, data.timestamp)
+    await end_game_on_stop(data.action)
+    return result
+
+
+@router.post("/press/{action}")
+async def button_press_simple(action: ButtonAction, db: Session = Depends(get_db)):
+    """Simple endpoint: POST /api/buttons/press/start"""
+    if not is_action_allowed(action, show_is_running()):
+        return ignored_response(action)
+
+    result = await perform(action, db)
+    await end_game_on_stop(action)
+    return result
 
 
 @router.post("/end")

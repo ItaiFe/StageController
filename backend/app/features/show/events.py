@@ -30,7 +30,7 @@ def launch_pole(count: int) -> Pole:
 
 
 def intro(game: str, count: int, side: str | None = None) -> ShowEvent:
-    pct = tunables.get("polePcts")[3 - count]
+    pct = tunables.get("polePcts")[tunables.SPEC["intro"]["steps"] - count]
 
     def pole(color):
         return Pole(pct=pct, color=color, mode="solid")

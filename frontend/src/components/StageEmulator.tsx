@@ -12,6 +12,7 @@ import type { GuideRow } from '../show/pressMeaning';
 import { SEGMENTS, stageFrame } from '../show/stageLook';
 import { pct, seekTargets, segments, thunderSeek } from '../show/timeline';
 import type { SongMapInfo } from '../show/timeline';
+import LightRules from './LightRules';
 import { StageView } from './StageView';
 import './StageEmulator.css';
 
@@ -370,6 +371,8 @@ export function StageEmulator() {
           </ol>
         )}
       </section>
+
+      <LightRules spec={spec} state={event?.state} game={event?.game} />
 
       {songId !== null && songMap?.songId === songId && player && (
         <Timeline map={songMap.map} spec={spec} time={player.current_time} duration={player.duration} />

@@ -1,0 +1,17 @@
+.light-rules { margin: 0.75rem 0; }
+.light-rules-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: 0.5rem;
+}
+.light-rule {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+.light-rule strong { color: var(--text); }
+.light-rule ul { margin: 0.3rem 0 0; padding-left: 1rem; }
+.light-rule.active { border-color: var(--accent); background: rgba(255, 105, 180, 0.08); color: var(--text); }
+.light-rule.active strong { color: var(--accent); }

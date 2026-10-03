@@ -17,6 +17,7 @@ import asyncio
 
 from app.features.player.router import router as player_router
 from app.features.pillar.router import router as pillar_router
+from app.features.show.router import router as show_router
 from app.features.player.service import player as music_player, set_main_loop
 from app.features.stats.models import SongPlay
 from app.features.buttons.router import end_show, manager as button_manager, ButtonEvent
@@ -47,6 +48,7 @@ app.include_router(buttons_router, prefix=API_PREFIX)
 app.include_router(stats_router, prefix=API_PREFIX)
 app.include_router(player_router, prefix=API_PREFIX)
 app.include_router(pillar_router, prefix=API_PREFIX)
+app.include_router(show_router, prefix=API_PREFIX)
 
 
 @app.on_event("startup")

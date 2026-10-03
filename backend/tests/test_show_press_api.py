@@ -59,3 +59,13 @@ def test_press_with_side_goes_to_the_director(client, monkeypatch):
 def test_bad_side_or_negative_age_is_rejected(client):
     assert client.post("/api/buttons/press", json={"action": "start", "side": "X"}).status_code == 422
     assert client.post("/api/buttons/press", json={"action": "start", "side": "L", "first_press_ago_ms": -1}).status_code == 422
+
+
+def test_spec_endpoint_serves_the_stage_spec():
+    from app.features.show.router import router as show_router
+
+    app = FastAPI()
+    app.include_router(show_router, prefix="/api")
+    spec = TestClient(app).get("/api/show/spec").json()
+    assert spec["palette"]["pink"]["ramp"][1] == [255, 20, 147]
+    assert [g["id"] for g in spec["games"]] == ["solo", "duet", "showoff", "thunder"]

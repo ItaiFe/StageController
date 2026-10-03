@@ -36,6 +36,12 @@ export class GestureDetector {
   private pressedAt: number | null = null;
   private lastReleaseAt: number | null = null;
   private longFired = false;
+  private firstPress = 0;
+
+  /** When the first press of the latest gesture started; still valid right after tick() returns that gesture */
+  get firstPressAt(): number {
+    return this.firstPress;
+  }
 
   /** Taps counted so far in the gesture being built */
   get pendingTaps(): number {
@@ -48,6 +54,7 @@ export class GestureDetector {
 
   press(now: number): null {
     if (this.pressedAt !== null) return null;
+    if (this.count === 0) this.firstPress = now;
     this.pressedAt = now;
     this.longFired = false;
     return null;

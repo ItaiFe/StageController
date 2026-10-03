@@ -1,0 +1,175 @@
+.stage-emulator {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.emulator-header {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.emulator-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--accent);
+}
+
+.emulator-header p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.emulator-conn {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+
+.emulator-conn.on { color: var(--success); }
+.emulator-conn.off { color: var(--danger); }
+
+.emulator-stage {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 1.5rem;
+  background: #0d0a0b;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+
+.emulator-tstage {
+  width: min(440px, 50%);
+  align-self: center;
+}
+
+.stage-part {
+  fill: #261a1f;
+  stroke: var(--border);
+  stroke-width: 2;
+  transition: fill 0.12s;
+}
+
+.stage-label {
+  fill: var(--text-muted);
+  font-size: 12px;
+}
+
+.emulator-pillar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.emulator-pole {
+  width: 22px;
+  height: 260px;
+  border-radius: 6px;
+  box-shadow: 0 0 0 4px #1a1216;
+}
+
+.emulator-button {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  border: 3px solid var(--accent);
+  background: radial-gradient(circle at 50% 50%, var(--accent-dim) calc(var(--hold, 0) * 100%), var(--bg-card) 0);
+  color: var(--text);
+  font-size: 1.25rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  touch-action: none;
+}
+
+.emulator-button small {
+  font-size: 0.65rem;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.emulator-button.pressed {
+  background: var(--accent);
+  color: var(--bg-deep);
+}
+
+.emulator-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.emulator-card {
+  background: rgba(51, 34, 40, 0.6);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.emulator-card h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.emulator-macros,
+.emulator-devices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.emulator-macros button.stop { border-color: var(--danger); color: var(--danger); }
+.emulator-devices button.on { background: var(--accent-dim); border-color: var(--accent); }
+
+.emulator-note {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.emulator-status {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.3rem 1rem;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.emulator-status dt { color: var(--text-muted); }
+.emulator-status dd { margin: 0; }
+
+.emulator-log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.emulator-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 14rem;
+  overflow-y: auto;
+  font-size: 0.8rem;
+  font-family: ui-monospace, monospace;
+}
+
+.emulator-log li span {
+  color: var(--text-muted);
+  margin-right: 0.6rem;
+}

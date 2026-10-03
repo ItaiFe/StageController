@@ -11,3 +11,4 @@ export { StatsPage } from './StatsPage';
 export { ButtonTestPage } from './ButtonTestPage';
 export { PillarPage } from './pillar/PillarPage';
 export { MusicEditor } from './MusicEditor';
+export { StageEmulator } from './StageEmulator';

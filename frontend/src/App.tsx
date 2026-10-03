@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Song, Playlist, PlaylistDetail, Device, Sequence } from './api';
 import { songsApi, playlistsApi, devicesApi } from './api';
-import { Player, SongTable, PlaylistSidebar, UploadButton, AddToPlaylistButton, PromptModal, ConfirmModal, LoginPage, StageControl, AddDeviceModal, SequenceModal, StatsPage, MusicEditor, ButtonTestPage, PillarPage } from './components';
+import { Player, SongTable, PlaylistSidebar, UploadButton, AddToPlaylistButton, PromptModal, ConfirmModal, LoginPage, StageControl, AddDeviceModal, SequenceModal, StatsPage, MusicEditor, ButtonTestPage, PillarPage, StageEmulator } from './components';
 import { useBackendPlayer } from './hooks/useBackendPlayer';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import './App.css';
@@ -9,7 +9,7 @@ import './App.css';
 const AUTH_KEY = 'flamingods_auth';
 const STAGE_PASSWORD = 'flamingo';
 
-type View = 'songs' | 'playlists' | 'stage' | 'pillar' | 'stats' | 'test';
+type View = 'songs' | 'playlists' | 'stage' | 'pillar' | 'stats' | 'test' | 'emulator';
 type ModalState =
   | { type: 'none' }
   | { type: 'createPlaylist' }
@@ -220,6 +220,12 @@ export default function App() {
           >
             Test
           </button>
+          <button
+            className={view === 'emulator' ? 'active' : ''}
+            onClick={() => setView('emulator')}
+          >
+            Emulator
+          </button>
         </nav>
       </header>
 
@@ -337,6 +343,7 @@ export default function App() {
         {view === 'stats' && <StatsPage />}
         {view === 'pillar' && <PillarPage />}
         {view === 'test' && <ButtonTestPage />}
+        {view === 'emulator' && <StageEmulator />}
       </main>
 
       {player.currentSong && (

@@ -1,5 +1,6 @@
 import type { ButtonAction } from './buttonGesture';
 import type { Sequence as PillarSequence, Slot } from './pillar/types';
+import type { ShowSpec } from './show/events';
 
 const API_BASE = import.meta.env.DEV ? 'http://localhost:8000/api' : '/api';
 
@@ -374,9 +375,31 @@ export const statsApi = {
 };
 
 // Button API — the same endpoint the StagePillar ESP32 calls
+export interface PressResult {
+  status: 'ok' | 'ignored';
+  action: ButtonAction;
+  reason?: string;
+  show_state?: string;
+}
+
 export const buttonsApi = {
-  press: async (action: ButtonAction): Promise<{ status: 'ok' | 'ignored'; action: ButtonAction; reason?: string }> => {
-    const res = await fetch(`${API_BASE}/buttons/press/${action}`, { method: 'POST' });
+  /** With `side`, the press goes to the show director like a pillar's (docs/show-events-contract.md). */
+  press: async (action: ButtonAction, side?: { side: 'L' | 'R'; firstPressAgoMs: number }): Promise<PressResult> => {
+    const res = side
+      ? await fetch(`${API_BASE}/buttons/press`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action, side: side.side, first_press_ago_ms: side.firstPressAgoMs }),
+        })
+      : await fetch(`${API_BASE}/buttons/press/${action}`, { method: 'POST' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  },
+};
+
+export const showApi = {
+  getSpec: async (): Promise<ShowSpec> => {
+    const res = await fetch(`${API_BASE}/show/spec`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   },

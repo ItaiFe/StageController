@@ -1,8 +1,10 @@
-"""Thunder round (spec `thunder`): the countdown and window at the end of verses 2..N-1, and what
-a press on a pole means there.
+"""Thunder round (spec `thunder`): the countdown and window at section changes, and what a press on a
+pole means there. The first window is at the change that ends verse 2; after that one every
+`thunder.everySections` section changes to the end of the song, never into the final section, and
+never when its countdown would start before the previous window has ended.
 
 Pure: no player or DB, time is always song seconds passed in, and the pole choice comes from an
-injected RNG (anything with `choice`). Everything is relative to beat 0, the beat nearest the verse
+injected RNG (anything with `choice`). Everything is relative to beat 0, the beat nearest the section
 change; that beat *is* the change for grace, firing and offsets, so a tag pressed on the change
 fires on it rather than a beat later when the analyzer's section edge sits a few ms after it.
 A song without beats gets an even grid instead: countdownBeats steps over fallbackCountdownMs,
@@ -34,8 +36,8 @@ class Frame:
 
 
 class Window:
-    def __init__(self, verse: int, pole: str, grid: list[float], b0: int, window_beats: int):
-        self.verse, self.pole, self.window_beats = verse, pole, window_beats
+    def __init__(self, section: int, pole: str, grid: list[float], b0: int, window_beats: int):
+        self.section, self.pole, self.window_beats = section, pole, window_beats  # section: 1-based, the one ending
         self._grid, self._b0 = grid, b0
         self.countdown_beats = tunables.get("countdownBeats")
         self.rush_beats = tunables.get("rushBeats")
@@ -97,7 +99,7 @@ class Window:
 
     def record(self, song_id, bpm) -> dict:
         offset = None if self.press_s is None else round((self.press_s - self.change_s) * 1000)
-        return {"songId": str(song_id), "verse": self.verse, "pole": self.pole, "outcome": self.outcome or "none",
+        return {"songId": str(song_id), "section": self.section, "pole": self.pole, "outcome": self.outcome or "none",
                 "pressOffsetMs": offset, "windowBeats": self.window_beats, "bpm": bpm}
 
     def _beat(self, t: float) -> int:
@@ -109,7 +111,16 @@ class Window:
         return self._grid[i] if i < len(self._grid) else t
 
 
-def _window(m: SongMap, verse: int, change: float, pole: str) -> Window:
+def boundaries(sections: list[dict], every: int) -> list[int]:
+    """1-based numbers of the sections whose end gets a window: the end of verse 2, then every `every`-th
+    section change after it, skipping a change into the final section."""
+    verses = [n for n, s in enumerate(sections, 1) if s["label"] == "verse"]
+    if len(verses) < 2:
+        return []
+    return list(range(verses[1], len(sections) - 1, every))
+
+
+def _window(m: SongMap, section: int, change: float, pole: str) -> Window:
     countdown, short, long_ = (tunables.get(k) for k in ("countdownBeats", "windowBeatsShort", "windowBeatsLong"))
     b = m.beats
     if b:
@@ -117,20 +128,28 @@ def _window(m: SongMap, verse: int, change: float, pole: str) -> Window:
         if b0 + short < len(b):
             w = short if b[b0 + short] - b[b0] >= tunables.get("minWindowMs") / 1000 else long_
             if b0 - countdown >= 0 and b0 + w < len(b):
-                return Window(verse, pole, b, b0, w)
+                return Window(section, pole, b, b0, w)
     # no beats (or not enough around the change): an even grid from the fallback tunables
     step_in = tunables.get("fallbackCountdownMs") / 1000 / countdown
     step_out = tunables.get("fallbackWindowMs") / 1000 / short
     grid = [change - (countdown - i) * step_in for i in range(countdown)] + [change + j * step_out for j in range(short + 1)]
-    return Window(verse, pole, grid, countdown, short)
+    return Window(section, pole, grid, countdown, short)
+
+
+def every_sections() -> int:
+    return tunables.SPEC["thunder"]["everySections"]
 
 
 class Thunder:
     """The windows of one song, poles drawn when the song starts."""
 
     def __init__(self, m: SongMap, rng):
-        verses = [s for s in m.sections if s["label"] == "verse"]
-        self.windows = [_window(m, k, verses[k - 1]["end"], rng.choice(["L", "R"])) for k in range(2, len(verses))]
+        self.windows: list[Window] = []
+        for n in boundaries(m.sections, every_sections()):
+            w = _window(m, n, m.sections[n - 1]["end"], rng.choice(["L", "R"]))
+            # the countdown must not run into the previous window (sections shorter than countdown + window)
+            if not self.windows or w.start_s >= self.windows[-1].end_s:
+                self.windows.append(w)
 
     def frame(self, t: float) -> Frame | None:
         for w in self.windows:

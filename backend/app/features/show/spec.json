@@ -214,13 +214,11 @@
     }
   },
   "thunder": {
-    "activeAtVerseEnds": "2..N-1",
-    "noCountdownNoWindowAfter": [
-      1,
-      "last verse"
-    ],
+    "firstWindowAt": "the section change that ends verse 2",
+    "everySections": 2,
+    "windowsAt": "the end of verse 2, then every everySections-th section change after it to the end of the song; never at a change into the final section; a window whose countdown would start before the previous window ends is dropped",
     "why": "first window is after verse 2, which is after the skip cutoff; a countdown only exists to lead into a window",
-    "poleChoice": "random per verse; the other pole is dark",
+    "poleChoice": "random per window; the other pole is dark",
     "phases": [
       {
         "id": "rest",
@@ -248,13 +246,13 @@
       },
       {
         "id": "tag",
-        "trigger": "press on active pole in [verseChange - graceMs, windowEnd]",
-        "fireAt": "first beat >= max(verseChange, press)",
+        "trigger": "press on active pole in [sectionChange - graceMs, windowEnd]",
+        "fireAt": "first beat >= max(sectionChange, press)",
         "effect": "half-beat blackout, new look, smoke puff"
       },
       {
         "id": "early",
-        "trigger": "press on active pole after countdown start and before verseChange - graceMs",
+        "trigger": "press on active pole after countdown start and before sectionChange - graceMs",
         "effect": "pole falls to 0 in earlyFallMs; countdown and window cancelled; whoever is on stage gets an empowering halo for flareBars"
       },
       {
@@ -377,6 +375,29 @@
       "value": 2000,
       "unit": "ms",
       "he": "חלון הספירה של לחיצות המחיאות. הצעה: ערך קיים בקוד גובר"
+    },
+    {
+      "id": "ambientGlowPct",
+      "group": "בשיר",
+      "value": 35,
+      "unit": "%",
+      "he": "בהירות הזוהר של העמודים בשיר, בצבע של הצד לפי מפת השיר והמשחק. נמוך מהמילוי של ההפעלה, האינטרו והרעם כדי שיבלטו"
+    },
+    {
+      "id": "handoverPulses",
+      "group": "בשיר",
+      "value": 3,
+      "unit": "pulses",
+      "note": "added by Tom, 2026-10-03 (not in the spec)",
+      "he": "בכל החלפת זמר שני הכפתורים מהבהבים יחד (דעיכה פנימה והחוצה) כמה פעמים, ואז מקבלים את צבע הזמר החדש"
+    },
+    {
+      "id": "handoverPulseMs",
+      "group": "בשיר",
+      "value": 1000,
+      "unit": "ms",
+      "note": "added by Tom, 2026-10-03 (not in the spec)",
+      "he": "כמה זמן נמשכים כל ההבהובים של החלפת הזמר, יחד"
     },
     {
       "id": "countdownBeats",
@@ -599,10 +620,10 @@
         "type": "window",
         "fields": {
           "songId": "string",
-          "verse": "int",
+          "section": "int (1-based, the section whose end the window is at)",
           "pole": "L|R",
           "outcome": "tag|early|none",
-          "pressOffsetMs": "int|null (relative to verse change)",
+          "pressOffsetMs": "int|null (relative to the section change)",
           "windowBeats": "int",
           "bpm": "number"
         }

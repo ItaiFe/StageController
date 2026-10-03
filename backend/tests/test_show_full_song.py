@@ -53,6 +53,9 @@ class SongPlayer:
     async def run_action(self, action):
         self.actions.append(action)
 
+    async def apply_scene(self, label):
+        pass
+
 
 @pytest.fixture(autouse=True)
 def jsonl(tmp_path, monkeypatch):
@@ -159,34 +162,41 @@ def thunder_phases(events):
     return [k for k, _ in groupby((e.thunder.phase, e.thunder.beat) for e in playing(events) if e.thunder)]
 
 
+# a thunder window with nobody pressing: the full countdown, then the drain
+UNTOUCHED = [("build", k) for k in range(-8, -4)] + [("rush", k) for k in range(-4, 0)] + [
+    ("open", 0), ("window", 1), ("window", 2), ("window", 3)]
+# the windows after the first (end of instrumental 3, instrumental 4, verse 3), none pressed
+LATER = [{"type": "window", "section": n, "outcome": "none", "pressOffsetMs": None} for n in (7, 9, 11)]
+
+
 def test_thunder_whole_song_with_a_tag(jsonl):
     # the right pillar's friend taps on the change; the pillar reports it 400 ms later
     events, player = run([("special", "L", 0), ("special", "R", 40)], script=[(127.07, "start", "R", 400)], pole="R")
     assert states(events) == EXPECTED_STATES
     assert [e.perimeter.side for e in events if e.state == "intro"] == ["L", "R", "centre"]
     assert thunder_phases(events) == [("build", k) for k in range(-8, -4)] + [("rush", k) for k in range(-4, 0)] + [
-        ("open", 0), ("tag", 1), ("new_look", 1)]
+        ("open", 0), ("tag", 1), ("new_look", 1)] + UNTOUCHED * 3
     tag = next(e for e in playing(events) if e.thunder and e.thunder.phase == "tag")
     assert tag.song.t == pytest.approx(127.269, abs=0.021)
     assert player.actions == ["special"]
     check_log(jsonl, "thunder", 6, extra=[
         {"type": "press", "side": "R", "kind": "tag"},
-        {"type": "window", "songId": "1", "verse": 2, "pole": "R", "outcome": "tag", "pressOffsetMs": 15,  # arrived on the 127.08 tick
-         "windowBeats": 4, "bpm": 103.4}])
+        {"type": "window", "songId": "1", "section": 5, "pole": "R", "outcome": "tag", "pressOffsetMs": 15,  # arrived on the 127.08 tick
+         "windowBeats": 4, "bpm": 103.4}, *LATER])
 
 
 def test_thunder_whole_song_with_an_early_press(jsonl):
     events, player = run([("special", "L", 0), ("special", "R", 40)], script=[(124.5, "start", "L", 400)], pole="L")
-    assert thunder_phases(events) == [("build", k) for k in range(-8, -4)] + [("rush", -4), ("early", -4)]
+    assert thunder_phases(events) == [("build", k) for k in range(-8, -4)] + [("rush", -4), ("early", -4)] + UNTOUCHED * 3
     early = next(e for e in playing(events) if e.thunder and e.thunder.phase == "early")
     assert (early.poles.L.mode, early.poles.L.pct, early.perimeter.look) == ("drain", 62, "halo")
     assert player.actions == []
     check_log(jsonl, "thunder", 6, extra=[
         {"type": "press", "side": "L", "kind": "early"},
-        {"type": "window", "verse": 2, "pole": "L", "outcome": "early", "pressOffsetMs": -2565}])
+        {"type": "window", "section": 5, "pole": "L", "outcome": "early", "pressOffsetMs": -2565}, *LATER])
 
 
 def test_thunder_whole_song_without_a_press(jsonl):
     events, _ = run([("special", "L", 0), ("special", "R", 40)], pole="L")
-    assert thunder_phases(events)[-4:] == [("open", 0), ("window", 1), ("window", 2), ("window", 3)]
-    check_log(jsonl, "thunder", 6, extra=[{"type": "window", "outcome": "none", "pressOffsetMs": None}])
+    assert thunder_phases(events) == UNTOUCHED * 4
+    check_log(jsonl, "thunder", 6, extra=[{"type": "window", "section": 5, "outcome": "none", "pressOffsetMs": None}, *LATER])

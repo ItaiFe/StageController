@@ -3,6 +3,7 @@ import json
 import pytest
 
 from app.features.show import events, tunables
+from app.features.show.schemas import Pole
 
 
 @pytest.fixture(autouse=True)
@@ -28,10 +29,10 @@ def test_duet_intro_steps_down_the_pole_pcts_on_both_sides():
     assert ev.step == 2 and ev.state == "intro" and ev.game == "duet"
 
 
-def test_solo_intro_lights_only_the_presser():
-    ev = events.intro("solo", 3, "R")
-    assert poles(ev) == {"L": (0, None, "off"), "R": (100, "pink", "solid")}
-    assert ev.perimeter.side == "R"
+def test_solo_intro_lights_both_poles_and_all_round():
+    assert [poles(events.intro("solo", c)) for c in (3, 2, 1)] == [
+        {"L": (p, "pink", "solid"), "R": (p, "pink", "solid")} for p in (100, 66, 33)]
+    assert events.intro("solo", 3).perimeter.side == "both"
 
 
 def test_showoff_intro_keeps_player_colours_then_merges_to_pink():
@@ -53,10 +54,47 @@ def test_fail_events_are_white_and_fade_uses_the_tunable():
     assert fade.poles.R.mode == "drain" and fade.poles.R.ms == 500
 
 
-def test_playing_and_idle_have_poles_off():
-    ev = events.playing("duet", 7)
-    assert ev.song.id == 7 and poles(ev)["L"][2] == "off"
-    assert events.idle().state == "idle"
+def test_idle_has_poles_off():
+    assert events.idle().state == "idle" and events.idle().poles.L.mode == "off"
+
+
+def glows(ev):
+    return {s: (p.color, p.level) if p.mode == "glow" else p.mode for s, p in ev.poles}
+
+
+@pytest.mark.parametrize("game, turn, owner, want", [
+    ("solo", None, "R", {"L": ("pink", 35), "R": ("pink", 35)}),  # no turns in solo, any owner
+    ("duet", None, "L", {"L": ("lime", 35), "R": "off"}),
+    ("duet", None, "R", {"L": "off", "R": ("blue", 35)}),
+    ("duet", None, "both", {"L": ("pink", 35), "R": ("pink", 35)}),
+    ("showoff", "L", None, {"L": ("lime", 35), "R": "off"}),
+    ("showoff", "R", None, {"L": "off", "R": ("blue", 35)}),
+    ("showoff", "both", None, {"L": ("pink", 35), "R": ("pink", 35)}),
+    ("thunder", None, "R", {"L": "off", "R": ("blue", 35)}),
+    ("thunder", None, None, {"L": ("pink", 35), "R": ("pink", 35)}),
+])
+def test_in_song_poles_glow_in_the_colour_of_whoever_owns_the_section(game, turn, owner, want):
+    ev = events.playing(game, 7, ("verse", 1), turn, owner=owner)
+    assert ev.song.id == 7 and glows(ev) == want
+    assert all(p.pct == 100 for _, p in ev.poles if p.mode == "glow")
+
+
+def test_the_glow_level_is_a_tunable():
+    tunables.set_override("ambientGlowPct", 20)
+    try:
+        assert events.playing("duet", 7).poles.L.level == 20
+    finally:
+        tunables.clear_overrides()
+
+
+def test_a_thunder_frame_replaces_the_glow_except_for_the_new_look():
+    from app.features.show.thunder import Frame
+    fill = Pole(pct=50, color="white", mode="solid")
+    ev = events.playing("thunder", 7, thunder=Frame("build", -4, "L", {"L": fill}), owner="both")
+    assert glows(ev) == {"L": "solid", "R": "off"}  # the dark pole is off
+    assert glows(events.playing("thunder", 7, thunder=Frame("tag", 1, "L", {}))) == {"L": "off", "R": "off"}
+    # after a tag the tagger owns the stage: the new look glows their colour
+    assert glows(events.playing("thunder", 7, thunder=Frame("new_look", 1, "L", {}), owner="L")) == {"L": ("lime", 35), "R": "off"}
 
 
 def test_event_serialises_to_the_documented_envelope():

@@ -108,10 +108,12 @@ def test_songmap_endpoint_gives_sections_with_turn_colours_and_the_cutoff(tmp_pa
     body = client.get("/api/show/songmap/1").json()
     verses = [(s["start"], s["turn"], s["color"]) for s in body["sections"] if s["label"] == "verse"]
     assert verses == [(66.04, "L", "lime"), (104.77, "R", "blue"), (194.49, "L", "lime")]
-    assert set(body["sections"][0]) == {"start", "end", "label", "index", "turn", "color"}
+    assert set(body["sections"][0]) == {"start", "end", "label", "index", "turn", "color", "singer", "singer_color"}
+    assert [s["singer"] for s in body["sections"] if s["label"] == "verse"] == ["L", "R", "L"]  # untagged: the alternation
+    assert [round(w["change_s"], 1) for w in body["thunder_windows"]] == [126.7, 143.0, 180.5, 215.5]
     assert body["sections"][-1]["turn"] == "both" and body["skip_cutoff_s"] == pytest.approx(115.72)
     empty = client.get("/api/show/songmap/2").json()
-    assert empty["sections"] == [] and not empty["has_markers"]
+    assert empty["sections"] == [] and not empty["has_markers"] and empty["thunder_windows"] == []
     assert client.get("/api/show/songmap/9").status_code == 404
 
 
@@ -120,3 +122,11 @@ def test_a_sidecar_with_malformed_sections_is_the_same_as_none(tmp_path):
     for sections in ([{"start": 0, "end": 5}], ["verse"]):
         bad.write_text(json.dumps({"sections": sections}))
         assert not SongMap.load(bad).has_markers
+
+
+def test_singer_reads_a_hand_tagged_turn_and_falls_back_to_the_alternation():
+    secs = [{"start": 0, "end": 10, "label": "verse", "turn": "R"}, {"start": 10, "end": 20, "label": "verse"},
+            {"start": 20, "end": 30, "label": "chorus", "turn": "L"}, {"start": 30, "end": 40, "label": "outro", "turn": "R"}]
+    m = SongMap(None, [], secs)
+    assert [m.singer(t) for t in (5, 15, 25, 35)] == ["R", "R", "L", "both"]  # verse 2 alternates to R; the end is both
+    assert [m.turn_owner(t) for t in (5, 15, 25, 35)] == ["L", "R", "both", "both"]  # showoff ignores the tags

@@ -5,7 +5,7 @@ import pytest
 
 from app.features.show import tunables
 from app.features.show.songmap import SongMap
-from app.features.show.thunder import Thunder
+from app.features.show.thunder import Thunder, boundaries
 
 FIXTURE = Path(__file__).parent / "fixtures" / "its_only_love.analysis.json"
 
@@ -36,10 +36,10 @@ def beat(m, k, b0=169):
     return m.beats[b0 + k]
 
 
-def test_one_window_at_the_end_of_verse_two_on_the_beat_grid():
+def test_first_window_at_the_end_of_verse_two_on_the_beat_grid():
     m, th = fixture()
-    (w,) = th.windows
-    assert w.verse == 2 and w.pole == "L"
+    w = th.windows[0]
+    assert w.section == 5 and w.pole == "L"  # section 5 is verse 2
     assert w.change_s == beat(m, 0) == 126.665  # the beat nearest the verse end (126.67)
     assert w.window_beats == 4  # 4 beats at 103.4 bpm = 2.345 s >= minWindowMs
     assert w.start_s == beat(m, -8) == 121.951
@@ -52,12 +52,35 @@ def test_the_pole_comes_from_the_injected_rng():
     assert Thunder(m, random.Random(1)).windows[0].pole == Thunder(m, random.Random(1)).windows[0].pole
 
 
-def test_no_window_after_verse_one_or_the_last_verse():
-    secs = [{"start": i * 10, "end": i * 10 + 10, "label": "verse"} for i in range(5)]
-    th = Thunder(SongMap(None, [], secs), Pick("L"))
-    assert [w.verse for w in th.windows] == [2, 3, 4]
-    assert [w.change_s for w in th.windows] == [20, 30, 40]
+def test_then_every_second_section_change_but_never_into_the_final_section():
+    m, th = fixture()
+    # verse 2 end, instrumental 3 end, instrumental 4 end, verse 3 end; not chorus 3 end (into the outro)
+    assert [w.section for w in th.windows] == [5, 7, 9, 11]
+    assert [round(w.change_s, 1) for w in th.windows] == [126.7, 143.0, 180.5, 215.5]  # on the nearest beat
+    assert all(a.end_s <= b.start_s for a, b in zip(th.windows, th.windows[1:]))
+
+
+def test_window_sections_follow_the_rule():
+    secs = [{"start": i * 10, "end": i * 10 + 10, "label": "verse"} for i in range(7)]
+    assert boundaries(secs, 2) == [2, 4]  # 6 -> 7 is into the final section
+    assert boundaries(secs, 1) == [2, 3, 4, 5]
+    assert boundaries(secs[:3], 2) == []  # verse 2 runs into the final section
+    assert boundaries([{"start": 0, "end": 10, "label": "verse"}, {"start": 10, "end": 20, "label": "chorus"}], 2) == []
     assert Thunder(SongMap(None, [], []), Pick("L")).windows == []
+
+
+def test_cadence_comes_from_the_spec(monkeypatch):
+    monkeypatch.setitem(tunables.SPEC["thunder"], "everySections", 3)
+    _, th = fixture()
+    assert [w.section for w in th.windows] == [5, 8, 11]
+
+
+def test_a_window_whose_countdown_would_overlap_the_previous_one_is_dropped():
+    # 3 s sections without beats: countdown 4 s + window 2.5 s does not fit between changes 3 s apart
+    secs = [{"start": i * 3, "end": i * 3 + 3, "label": "verse"} for i in range(8)]
+    th = Thunder(SongMap(None, [], secs), Pick("L"))
+    # every 2 sections: changes at 6, 12 and 18 s
+    assert [w.change_s for w in th.windows] == [6, 18]  # 12 s: countdown from 8 s, previous window ends 8.5 s
 
 
 def frames(m, th, ks):
@@ -104,7 +127,7 @@ def test_tag_fires_on_the_first_beat_after_the_press_arrives():
     look = th.frame(127.27 + 0.3)  # after half a beat
     assert (look.phase, look.poles, look.perimeter.look) == ("new_look", {}, "new_look")
     assert th.frame(129.1) is None
-    assert w.record(7, 103.4) == {"songId": "7", "verse": 2, "pole": "L", "outcome": "tag", "pressOffsetMs": 5,
+    assert w.record(7, 103.4) == {"songId": "7", "section": 5, "pole": "L", "outcome": "tag", "pressOffsetMs": 5,
                                   "windowBeats": 4, "bpm": 103.4}
 
 
@@ -143,7 +166,7 @@ def test_early_press_drops_the_pole_and_gives_a_halo():
     w = th.windows[0]
     f = th.frame(arrival)
     assert (f.phase, f.beat) == ("early", -3)
-    assert f.poles["R"].model_dump() == {"pct": 75, "color": "white", "mode": "drain", "ms": tunables.get("earlyFallMs")}
+    assert f.poles["R"].model_dump() == {"pct": 75, "color": "white", "mode": "drain", "ms": tunables.get("earlyFallMs"), "level": None}
     assert f.perimeter.look == "halo"
     bar = (beat(m, 4) - beat(m, 0)) / 4 * 4
     assert th.frame(arrival + bar * tunables.get("flareBars") - 0.01).phase == "early"
@@ -190,7 +213,7 @@ def test_none_is_reported_once_and_only_for_a_window_that_was_seen():
 def test_fallback_timing_without_beats():
     m = SongMap.load(FIXTURE)
     th = Thunder(SongMap(None, [], m.sections), Pick("L"))
-    (w,) = th.windows
+    w = th.windows[0]
     countdown, window = tunables.get("fallbackCountdownMs") / 1000, tunables.get("fallbackWindowMs") / 1000
     assert w.change_s == 126.67 and w.window_beats == tunables.get("windowBeatsShort")
     assert w.start_s == pytest.approx(126.67 - countdown) and w.end_s == pytest.approx(126.67 + window)
@@ -205,7 +228,7 @@ def test_fallback_timing_without_beats():
 def test_fast_song_gets_the_long_window():
     beats = [i * 0.25 for i in range(400)]  # 240 bpm: 4 beats = 1 s < minWindowMs
     secs = [{"start": 0, "end": 30, "label": "verse"}, {"start": 30, "end": 60, "label": "verse"},
-            {"start": 60, "end": 90, "label": "verse"}]
+            {"start": 60, "end": 90, "label": "verse"}, {"start": 90, "end": 99, "label": "outro"}]
     (w,) = Thunder(SongMap(240, beats, secs), Pick("L")).windows
     assert w.window_beats == tunables.get("windowBeatsLong") and w.end_s == 62.0
 

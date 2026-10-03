@@ -64,6 +64,15 @@ class SongMap:
             return "both"
         return "L" if self._verses.index(current) % 2 == 0 else "R"
 
+    def singer(self, t: float, duration: float = 0.0) -> str:
+        """Duet (and thunder before a steal): who sings this section. The sidecar may say so per section
+        (optional `turn`: L | R | both, hand-tagged; the analyzer does not detect voices); untagged
+        sections fall back to the showoff alternation. A duet ends with both: the last section is both."""
+        current = next((s for s in self.sections if t < s["end"]), self.sections[-1]) if self.sections else None
+        if current is not None and current is not self.sections[-1] and current.get("turn") in ("L", "R", "both"):
+            return current["turn"]
+        return self.turn_owner(t, duration)
+
     def beat_at(self, t: float) -> int:
         """Index of the last beat at or before t; -1 before the first."""
         return bisect_right(self.beats, t) - 1

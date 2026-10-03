@@ -74,8 +74,8 @@ class Rig:
         self.director = ShowDirector(self.player, self.clock, emit, lambda kind, mono, /, **f: self.log.append((kind, mono, f)),
                                      rng=rng)
 
-    def press(self, action, side, ago=0):
-        return asyncio.run(self.director.on_press(action, side, ago))
+    def press(self, action, side, ago=0, taps=None):
+        return asyncio.run(self.director.on_press(action, side, ago, taps))
 
     def advance(self, ms):
         end = self.clock.t + ms
@@ -446,8 +446,8 @@ def test_thunder_countdown_and_window_one_event_per_beat():
     assert [g[3] for g in got] == [12, 25, 38, 50, 62, 75, 88, 100, 100, 75, 50, 25]
     assert {g[2] for g in got} == {"R"} and {g[5] for g in got} == {"off"}
     assert [e.song.t for e in thunder_events(rig)][0] == pytest.approx(121.951, abs=0.021)
-    assert playing_events(rig)[-1].thunder is None and playing_events(rig)[-1].poles.R.mode == "off"  # rest after
-    assert kinds(rig, "window") == [{"songId": "1", "verse": 2, "pole": "R", "outcome": "none", "pressOffsetMs": None,
+    assert playing_events(rig)[-1].thunder is None and playing_events(rig)[-1].poles.R.mode == "glow"  # rest after: the white glow
+    assert kinds(rig, "window") == [{"songId": "1", "section": 5, "pole": "R", "outcome": "none", "pressOffsetMs": None,
                                      "windowBeats": 4, "bpm": 103.4}]
 
 
@@ -553,3 +553,120 @@ def test_section_scene_floodlights_in_choruses_spotlights_in_verses(t, flood, sp
 def test_scene_matches_names_by_prefix_case_insensitively():
     assert scene_for("chorus", ["FloodLights (x2)", "spotlights", "bubbles"]) == {"FloodLights (x2)": True, "spotlights": False}
     assert scene_for(None, ["floodLights (x2)"]) == {"floodLights (x2)": False}
+
+
+@pytest.mark.parametrize("action, taps, game", [
+    ("claps", 2, "showoff"),
+    ("special", 3, "thunder"),
+    ("skip", 4, "fail"),     # over matchMaxCount
+    ("special", 5, "fail"),  # the action name alone ("special" = 3) would launch thunder
+])
+def test_launch_counts_the_real_taps_when_the_press_says_them(action, taps, game):
+    rig = Rig()
+    rig.press(action, "L", taps=taps)
+    rig.press(action, "R", ago=50, taps=taps)
+    rig.advance(500 + STEP)
+    (attempt,) = [f for kind, _, f in rig.log if kind == "launch_attempt"]
+    assert (attempt["countL"], attempt["countR"], attempt["result"]) == (taps, taps, game)
+
+
+def test_solo_glows_both_poles_pink_and_showoff_follows_the_turns():
+    rig = Rig()
+    rig.press("start", "R")
+    rig.advance(500 + 3000 + STEP)
+    p = playing_events(rig)[-1].poles
+    assert (p.L.mode, p.L.color, p.R.mode, p.R.color) == ("glow", "pink", "glow", "pink")
+
+    rig = Rig()
+    play_game(rig)
+    for t in (70, 100, 110):  # verse 1 (L), instrumental, verse 2 (R)
+        seek(rig, t)
+    assert [(e.poles.L.color, e.poles.R.color) for e in playing_events(rig)][-3:] == [
+        ("lime", None), ("pink", "pink"), (None, "blue")]
+
+
+@pytest.mark.parametrize("taps", [1, 2, 3])
+def test_solo_from_left_or_right_gives_the_same_show(taps):
+    """Solo is symmetric: only the launch fill (button feedback on the presser's own pole) and the
+    logged side differ; the intro, the song and every show event after it are identical."""
+    def run(side):
+        rig = Rig()
+        rig.player.map = SongMap.load(FIXTURE)
+        rig.press("start", side, taps=taps)
+        rig.advance(500 + 3000 + STEP)
+        for t in (70, 100, 110, 130, 260):
+            seek(rig, t)
+        shown = [e.model_dump(exclude={"timestamp"}) for _, e in rig.events if e.state != "launching"]
+        legacy = [e.model_dump(exclude={"timestamp"}) for _, e in rig.legacy]
+        return rig.director.game, shown, legacy
+
+    left, right = run("L"), run("R")
+    assert left[0] == "solo" and left == right
+
+
+def test_duet_poles_follow_the_singer_and_end_with_both():
+    rig = Rig()
+    rig.player.map = SongMap.load(FIXTURE)
+    rig.press("start", "L")
+    rig.press("start", "R", ago=50)
+    rig.advance(500 + 3000 + STEP)
+    assert rig.director.game == "duet"
+    for t in (70, 100, 110, 130, 260):  # verse 1, instrumental, verse 2, chorus, outro
+        seek(rig, t)
+    assert [(e.poles.L.color, e.poles.R.color) for e in playing_events(rig)][-5:] == [
+        ("lime", None), ("pink", "pink"), (None, "blue"), ("pink", "pink"), ("pink", "pink")]
+    assert all(e.turn is None for e in playing_events(rig))  # the perimeter stays the duet's
+
+
+@pytest.mark.parametrize("game, action", [("duet", "start"), ("showoff", "claps")])
+def test_a_change_of_singer_pulses_both_buttons_then_shows_the_new_colours(game, action):
+    rig = Rig()
+    rig.player.map = SongMap.load(FIXTURE)
+    rig.press(action, "L")
+    rig.press(action, "R", ago=50)
+    rig.advance(500 + 3000 + STEP)
+    assert rig.director.game == game
+    first = playing_events(rig)[0].buttons
+    assert (first.L, first.R, first.pulses) == ("pink", "pink", 0)  # song start: no handover
+    for t in (70, 100, 110):  # verse 1 (L), instrumental (both), verse 2 (R)
+        seek(rig, t)
+    got = [(e.buttons.L, e.buttons.R, e.buttons.pulses, e.buttons.pulse_ms) for e in playing_events(rig)[-3:]]
+    assert got == [("lime", None, 3, 1000), ("pink", "pink", 3, 1000), (None, "blue", 3, 1000)]
+
+
+def test_no_handover_pulse_without_a_change_of_singer():
+    rig = Rig()
+    play_game(rig, "start")  # solo: everyone sings, always
+    for t in (70, 100, 110):
+        seek(rig, t)
+    assert {(e.buttons.L, e.buttons.R, e.buttons.pulses) for e in playing_events(rig)} == {("pink", "pink", 0)}
+
+
+def test_thunder_poles_follow_the_singer_until_a_tag_then_the_tagger():
+    rig = play_thunder("L")
+    assert (playing_events(rig)[-1].poles.L.color, playing_events(rig)[-1].poles.R.color) == (None, "blue")  # verse 2
+    play_song(rig, 127.0)
+    rig.press("start", "L", ago=400)
+    play_song(rig, 135)
+    last = playing_events(rig)[-1]
+    assert last.thunder is None and (last.poles.L.color, last.poles.L.mode, last.poles.R.mode) == ("lime", "glow", "off")
+
+
+def cues(rig):
+    return [(e.cue, e.side, e.reason) for _, e in rig.legacy if e.action == "cue"]
+
+
+def test_claps_announce_a_cue_before_the_sequence_runs():
+    rig = Rig()
+    play_solo(rig)
+    rig.press("claps", "R")
+    rig.press("special", "R")
+    assert cues(rig) == [("claps", "R", "claps")]  # special has no cue
+
+
+def test_thunder_dark_pole_applause_is_a_claps_cue_the_active_pole_none():
+    rig = play_thunder("L")
+    play_song(rig, 122.5)
+    rig.press("claps", "L")
+    rig.press("claps", "R")
+    assert cues(rig) == [("claps", "R", "applause")]

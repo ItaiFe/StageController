@@ -2,7 +2,7 @@
 from datetime import datetime
 
 from . import tunables
-from .schemas import Perimeter, Pole, Poles, ShowEvent, SongInfo, ThunderInfo
+from .schemas import ButtonLights, Perimeter, Pole, Poles, ShowCue, ShowEvent, SongInfo, ThunderInfo
 
 OFF = Pole(pct=0, mode="off")
 
@@ -29,16 +29,13 @@ def launch_pole(count: int) -> Pole:
     return Pole(pct=min(100, pcts[min(count, len(pcts)) - 1]), color="pink", mode="solid")
 
 
-def intro(game: str, count: int, side: str | None = None) -> ShowEvent:
+def intro(game: str, count: int) -> ShowEvent:
     pct = tunables.get("polePcts")[tunables.SPEC["intro"]["steps"] - count]
 
     def pole(color):
         return Pole(pct=pct, color=color, mode="solid")
 
-    if game == "solo":
-        return _event("intro", {side: pole("pink")}, game=game, step=count,
-                      perimeter=Perimeter(look="intro", color="pink", side=side))
-    if game == "duet":
+    if game in ("solo", "duet"):  # solo is symmetric: which side pressed does not matter (user rule)
         return _event("intro", {"L": pole("pink"), "R": pole("pink")}, game=game, step=count,
                       perimeter=Perimeter(look="intro", color="pink", side="both"))
     if game == "showoff":
@@ -53,17 +50,45 @@ def intro(game: str, count: int, side: str | None = None) -> ShowEvent:
 TURN_COLOR = {"L": "lime", "R": "blue", "both": "pink"}
 
 
+def glow(color: str) -> Pole:
+    return Pole(pct=100, color=color, mode="glow", level=tunables.get("ambientGlowPct"))
+
+
+def ambient(game: str, owner: str | None) -> dict[str, Pole]:
+    """The poles' in-song glow, in the colour of whoever owns the section (a deviation from the spec's
+    0 % after the intro, asked for by the user). Solo has no turns: both pink, whichever side pressed.
+    Every two-player mode: L = left pole lime, R = right pole blue, both = both pink; the side not
+    singing is off."""
+    if game != "solo" and owner in ("L", "R"):
+        return {owner: glow(TURN_COLOR[owner])}
+    return {"L": glow("pink"), "R": glow("pink")}
+
+
+def buttons(game: str, singer: str, handover: bool = False) -> ButtonLights:
+    """The button rings in the singer's colour (the glow's colours, never thunder's frame); `handover`:
+    the singer just changed, so both pulse together first."""
+    glows = ambient(game, singer)
+    return ButtonLights(L=glows["L"].color if "L" in glows else None, R=glows["R"].color if "R" in glows else None,
+                        pulses=tunables.get("handoverPulses") if handover else 0,
+                        pulse_ms=tunables.get("handoverPulseMs") if handover else 0)
+
+
 def playing(game: str, song_id: int, section: tuple[str, int] | None = None, turn: str | None = None,
-            t: float = 0.0, thunder=None) -> ShowEvent:
-    """`thunder`: the thunder.Frame showing now, if any; it brings the poles and the perimeter."""
+            t: float = 0.0, thunder=None, owner: str | None = None, handover: bool = False) -> ShowEvent:
+    """`thunder`: the thunder.Frame showing now, if any; it brings the poles and the perimeter (the
+    active pole's fill, the dark pole off; the blackout all off; the new look back to the glow).
+    `owner`: whose section it is (solo: none; duet: the singer; showoff: the turn; thunder: the
+    singer until a tag, then the performer who tagged); defaults to the showoff `turn`, else both."""
     label, index = section or (None, None)
     perimeter = Perimeter(look="turn", color=TURN_COLOR[turn], side=turn) if turn else None
-    poles, info = {}, None
+    singer = owner or turn or "both"
+    poles, info = ambient(game, singer), None
     if thunder:
-        poles, perimeter = thunder.poles, thunder.perimeter
+        perimeter = thunder.perimeter
+        poles = poles if thunder.phase == "new_look" else thunder.poles
         info = ThunderInfo(phase=thunder.phase, pole=thunder.pole, beat=thunder.beat)
     return _event("playing", poles, game=game, song=SongInfo(id=song_id, section=label, section_index=index, t=round(t, 2)),
-                  turn=turn, perimeter=perimeter, thunder=info)
+                  turn=turn, perimeter=perimeter, thunder=info, buttons=buttons(game, singer, handover))
 
 
 def legacy_start(game: str):
@@ -79,3 +104,7 @@ def fail_blink(lit: str) -> ShowEvent:
 
 def fail_fade(lit: str) -> ShowEvent:
     return _event("failing", {lit: Pole(pct=100, color="white", mode="drain", ms=tunables.get("failFadeMs"))})
+
+
+def claps(side: str | None, reason: str = "claps") -> ShowCue:
+    return ShowCue(timestamp=datetime.now(), cue="claps", side=side, reason=reason)

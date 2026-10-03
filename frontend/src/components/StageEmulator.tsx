@@ -2,30 +2,43 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { buttonsApi, devicesApi, pillarApi, playerApi, showApi } from '../api';
 import type { Device, PlayerState, ShowLogLine } from '../api';
 import { GestureDetector, gestureAction, LONG_PRESS_MS } from '../buttonGesture';
-import type { Gesture } from '../buttonGesture';
 import { useShowEvents } from '../hooks/useShowEvents';
 import { renderSequence } from '../pillar/sequence';
-import { blankStrip } from '../pillar/types';
-import type { Sequence, Slot, Strip } from '../pillar/types';
-import { paletteRgb, polePixels, slotWithoutShow } from '../show/events';
-import type { ShowSpec } from '../show/events';
+import type { Sequence, Slot } from '../pillar/types';
+import { paletteRgb, slotWithoutShow } from '../show/events';
+import type { Rgb, ShowSpec } from '../show/events';
+import { answerText, gestureText, pressLine, showLine } from '../show/pressMeaning';
+import type { GuideRow } from '../show/pressMeaning';
+import { SEGMENTS, stageFrame } from '../show/stageLook';
 import { pct, seekTargets, segments, thunderSeek } from '../show/timeline';
 import type { SongMapInfo } from '../show/timeline';
-import { StripCanvas } from './pillar/StripCanvas';
+import { StageView } from './StageView';
 import './StageEmulator.css';
 
 type Side = 'L' | 'R';
 const SIDES: Side[] = ['L', 'R'];
 const KEYS: Record<string, Side> = { a: 'L', l: 'R' };
+const FEED_SIZE = 60;
+const GUIDE_LIT_MS = 1500;
+const GESTURE_TICK_MS = 20;
 const SLOT_SEED = 1;
-const DEVICE_POLL_MS = 1500;
+const JUMP_S = 2; // a song time change this far from the clock is a seek, skip or restart
+
+type FeedKind = 'press' | 'show' | 'device' | 'player';
+interface FeedLine { id: number; time: Date; kind: FeedKind; text: string; row?: GuideRow }
+
+/** The pillar's 100-pixel strip sampled onto the drawing's 24 pole segments, bottom first. */
+function stripSegments(strip: Uint8Array): Rgb[] {
+  const n = strip.length / 3;
+  return Array.from({ length: SEGMENTS }, (_, k) => {
+    const i = Math.floor(((k + 0.5) * n) / SEGMENTS) * 3;
+    return [strip[i], strip[i + 1], strip[i + 2]] as Rgb;
+  });
+}
+const DEVICE_POLL_MS = 500;
 const PLAYER_POLL_MS = 500;
 const LOG_POLL_MS = 2000;
 const SEEK_LEAD_S = 5;
-
-function describeGesture(g: Gesture): string {
-  return g.kind === 'long' ? 'long press' : `${g.count} tap${g.count === 1 ? '' : 's'}`;
-}
 
 function describeLogLine({ type, t: _t, mono: _mono, ...fields }: ShowLogLine): string {
   const rest = Object.entries(fields).map(([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`);
@@ -74,17 +87,17 @@ function Timeline({ map, spec, time, duration }: { map: SongMapInfo; spec: ShowS
 }
 
 export function StageEmulator() {
-  const { connected, show, log, clearLog } = useShowEvents();
+  const { connected, show } = useShowEvents();
   const [spec, setSpec] = useState<ShowSpec | null>(null);
-  const [slots, setSlots] = useState<Record<Slot, Sequence> | null>(null);
   const [player, setPlayer] = useState<PlayerState | null>(null);
   const [devices, setDevices] = useState<Device[]>([]);
-  const [strips, setStrips] = useState<Record<Side, Strip>>({ L: blankStrip(), R: blankStrip() });
   const [feedback, setFeedback] = useState<Record<Side, { pending: number; hold: number; pressed: boolean }>>({
     L: { pending: 0, hold: 0, pressed: false },
     R: { pending: 0, hold: 0, pressed: false },
   });
-  const [lastPress, setLastPress] = useState('');
+  const [feed, setFeed] = useState<FeedLine[]>([]);
+  const [slots, setSlots] = useState<Record<Slot, Sequence> | null>(null);
+  const [litRow, setLitRow] = useState<{ row: GuideRow; at: number } | null>(null);
   const [songMap, setSongMap] = useState<{ songId: number; map: SongMapInfo } | null>(null);
   const [nightLog, setNightLog] = useState<ShowLogLine[]>([]);
 
@@ -92,13 +105,37 @@ export function StageEmulator() {
   const pressedRef = useRef<Record<Side, boolean>>({ L: false, R: false });
   const showRef = useRef(show);
   const specRef = useRef(spec);
+  const lastShowLine = useRef('');
+  const playerRef = useRef(player);
+  const songMapRef = useRef(songMap);
+  const lookRef = useRef(0); // thunder: tags so far this song, picks the perimeter look
   const slotsRef = useRef(slots);
-  const songLoadedRef = useRef(false);
+  const slotStart = useRef<{ slot: Slot | null; at: number }>({ slot: null, at: 0 });
+  const devicesRef = useRef<Device[] | null>(null);
 
-  useEffect(() => { showRef.current = show; }, [show]);
-  useEffect(() => { specRef.current = spec; }, [spec]);
+  const feedId = useRef(0);
+  const addFeed = useCallback((kind: FeedKind, text: string, row?: GuideRow) => {
+    const id = ++feedId.current;
+    setFeed(prev => [{ id, time: new Date(), kind, text, row }, ...prev].slice(0, FEED_SIZE));
+    return id;
+  }, []);
   useEffect(() => { slotsRef.current = slots; }, [slots]);
-  useEffect(() => { songLoadedRef.current = player?.current_song != null; }, [player]);
+  useEffect(() => { specRef.current = spec; }, [spec]);
+  useEffect(() => {
+    if (!show) return;
+    const text = showLine(show.event);
+    if (text !== lastShowLine.current) addFeed('show', text);
+    lastShowLine.current = text;
+  }, [show, addFeed]);
+
+  useEffect(() => {
+    const before = showRef.current?.event.thunder?.phase;
+    showRef.current = show;
+    if (!show || show.event.state === 'idle') lookRef.current = 0;
+    else if (show.event.thunder?.phase === 'new_look' && before !== 'new_look') lookRef.current += 1;
+  }, [show]);
+  useEffect(() => { playerRef.current = player; }, [player]);
+  useEffect(() => { songMapRef.current = songMap; }, [songMap]);
 
   useEffect(() => {
     showApi.getSpec().then(setSpec).catch(e => console.error('Failed to load the stage spec:', e));
@@ -111,14 +148,47 @@ export function StageEmulator() {
       .catch(e => console.error('Failed to load the pillar slots:', e));
   }, []);
 
+  // Player and appliances: polled, and every change goes into the feed (what the controller did)
   useEffect(() => {
-    const pollPlayer = () => playerApi.getState().then(setPlayer).catch(() => {});
-    const pollDevices = () => devicesApi.getAll().then(setDevices).catch(() => {});
+    let last: { state: PlayerState; at: number } | null = null;
+    const pollPlayer = () => playerApi.getState().then(state => {
+      const now = performance.now();
+      const was = last?.state;
+      const song = state.current_song;
+      if (was && song && (was.current_song?.id !== song.id || was.playlist_name !== state.playlist_name || !was.current_song)) {
+        addFeed('player', `player: play "${song.title}" (${state.playlist_name ?? 'no'} playlist)`);
+      } else if (was?.current_song && !song) {
+        addFeed('player', 'player: stopped');
+      } else if (was && song && last) {
+        const expected = was.current_time + (state.is_playing ? (now - last.at) / 1000 : 0);
+        if (Math.abs(state.current_time - expected) > JUMP_S) {
+          // a skip in a one-song playlist replays the same song: it shows only as time back to 0
+          addFeed('player', state.current_time < JUMP_S
+            ? `player: "${song.title}" from the start (was at ${was.current_time.toFixed(1)} s)`
+            : `player: jumped ${was.current_time.toFixed(1)} → ${state.current_time.toFixed(1)} s`);
+        }
+      }
+      last = { state, at: now };
+      setPlayer(state);
+    }).catch(() => {});
+    const pollDevices = () => devicesApi.getAll().then(list => {
+      const before = devicesRef.current;
+      const changed = before ? list.filter(d => before.find(b => b.id === d.id)?.is_on === !d.is_on) : [];
+      if (changed.length) {
+        // the director switches a section's scene in one go: "chorus → floodLights (x2) on, spotlights off"
+        const e = showRef.current?.event;
+        const scene = e?.state === 'playing' && e.song?.section && changed.every(d => /^(flood|spot)/i.test(d.name));
+        const why = scene ? `${e.song!.section} → ` : 'appliances: ';
+        addFeed('device', why + changed.map(d => `${d.name} ${d.is_on ? 'on' : 'off'}`).join(', '));
+      }
+      devicesRef.current = list;
+      setDevices(list);
+    }).catch(() => {});
     pollPlayer();
     pollDevices();
     const timers = [window.setInterval(pollPlayer, PLAYER_POLL_MS), window.setInterval(pollDevices, DEVICE_POLL_MS)];
     return () => timers.forEach(window.clearInterval);
-  }, []);
+  }, [addFeed]);
 
   const songId = player?.current_song?.id ?? null;
   useEffect(() => {
@@ -126,57 +196,78 @@ export function StageEmulator() {
     showApi.getSongMap(songId).then(map => setSongMap({ songId, map })).catch(() => setSongMap(null));
   }, [songId]);
 
+  // the night log also refreshes on every show event: a background tab's timers get throttled, the socket doesn't
+  const showAt = show?.at;
   useEffect(() => {
     const poll = () => showApi.getLog().then(setNightLog).catch(() => {});
     poll();
     const timer = window.setInterval(poll, LOG_POLL_MS);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [showAt]);
 
-  const send = useCallback(async (side: Side, label: string, action: ReturnType<typeof gestureAction>, agoMs: number) => {
+  const send = useCallback(async (side: Side, taps: number | null, action: ReturnType<typeof gestureAction>, agoMs: number) => {
     if (!action) return;
+    const p = playerRef.current;
+    const map = songMapRef.current;
+    const tun = (id: string) => specRef.current?.tunables?.find(t => t.id === id)?.value;
+    const ctx = {
+      event: showRef.current?.event ?? null,
+      songT: p?.current_song ? p.current_time : null,
+      skipCutoffS: map && map.songId === p?.current_song?.id ? map.map.skip_cutoff_s : null,
+      launchWaitMs: Math.max(Number(tun('soloWaitMs') ?? 500), Number(tun('syncWindowMs') ?? 400)),
+      launchPcts: (tun('launchPcts') as number[] | undefined) ?? [33, 66, 100],
+    };
+    // the line goes up at once; the backend's answer can take a while (claps/special wait for their sequence)
+    const line = pressLine(side, gestureText(action, taps), action, ctx, '…');
+    const id = addFeed('press', line.text, line.row);
+    setLitRow({ row: line.row, at: performance.now() });
+    let answer: string;
     try {
-      const res = await buttonsApi.press(action, { side, firstPressAgoMs: Math.max(0, Math.round(agoMs)) });
-      setLastPress(`${side} ${label} → ${action}: ${res.status}${res.reason ? ` (${res.reason})` : ''}`);
+      answer = answerText(await buttonsApi.press(action, { side, firstPressAgoMs: Math.max(0, Math.round(agoMs)) }));
     } catch (e) {
-      setLastPress(`${side} ${label} → ${action}: ${e instanceof Error ? e.message : e}`);
+      answer = `error: ${e instanceof Error ? e.message : e}`;
     }
-  }, []);
+    const text = line.text.replace(/…$/, answer);
+    setFeed(prev => prev.map(l => (l.id === id ? { ...l, text } : l)));
+  }, [addFeed]);
 
-  // One frame loop: gesture timers, and what each pole shows right now
+  const frame = useCallback(() => {
+    const s = showRef.current;
+    const bpm = songMapRef.current?.map.bpm;
+    const now = performance.now();
+    // no show instruction: the poles play the pillar's own slot sequence, like the real pillar
+    const slot = slotWithoutShow(s?.event ?? null, playerRef.current?.current_song != null);
+    if (slot !== slotStart.current.slot) slotStart.current = { slot, at: now };
+    const seq = slot && slotsRef.current?.[slot];
+    const strip = seq ? stripSegments(renderSequence(seq, now - slotStart.current.at, SLOT_SEED)) : null;
+    const f = stageFrame(spec!, {
+      event: s?.event ?? null,
+      sinceEventS: s ? (performance.now() - s.at) / 1000 : 0,
+      nowS: performance.now() / 1000,
+      beatS: bpm ? 60 / bpm : 0.5,
+      look: lookRef.current,
+    });
+    if (strip) f.strips = { L: strip, R: strip };
+    return f;
+  }, [spec]);
+
+  // Gesture timers on a fixed tick, not animation frames: a hidden tab pauses rAF, and a hold
+  // would end up as a tap
   useEffect(() => {
-    let raf = 0;
-    let slotStart = { slot: null as Slot | null, at: 0 };
     const frame = () => {
       const now = performance.now();
       for (const side of SIDES) {
         const d = detectors.current[side];
         const gesture = d.tick(now);
-        if (gesture) send(side, describeGesture(gesture), gestureAction(gesture), now - d.firstPressAt);
+        if (gesture) send(side, gesture.kind === 'taps' ? gesture.count : null, gestureAction(gesture), now - d.firstPressAt);
       }
       setFeedback({
         L: { pending: detectors.current.L.pendingTaps, hold: detectors.current.L.holdProgress(now), pressed: pressedRef.current.L },
         R: { pending: detectors.current.R.pendingTaps, hold: detectors.current.R.holdProgress(now), pressed: pressedRef.current.R },
       });
-
-      const current = showRef.current;
-      const slot = slotWithoutShow(current?.event ?? null, songLoadedRef.current);
-      if (slot) {
-        if (slotStart.slot !== slot) slotStart = { slot, at: now };
-        const seq = slotsRef.current?.[slot];
-        const strip = seq ? renderSequence(seq, now - slotStart.at, SLOT_SEED) : blankStrip();
-        setStrips({ L: strip, R: strip });
-      } else if (current && specRef.current) {
-        slotStart = { slot: null, at: 0 };
-        const s = specRef.current;
-        const elapsed = now - current.at;
-        const { L, R } = current.event.poles;
-        setStrips({ L: polePixels(L, paletteRgb(s, L.color), elapsed), R: polePixels(R, paletteRgb(s, R.color), elapsed) });
-      }
-      raf = requestAnimationFrame(frame);
     };
-    raf = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(raf);
+    const timer = window.setInterval(frame, GESTURE_TICK_MS);
+    return () => window.clearInterval(timer);
   }, [send]);
 
   const press = useCallback((side: Side) => {
@@ -203,7 +294,7 @@ export function StageEmulator() {
   const macro = (label: string, counts: Partial<Record<Side, number>>) => ({
     label,
     run: () => (Object.entries(counts) as [Side, number][]).forEach(([side, n]) =>
-      send(side, `${n} tap${n === 1 ? '' : 's'}`, gestureAction({ kind: 'taps', count: n }), 0)),
+      send(side, n, gestureAction({ kind: 'taps', count: n }), 0)),
   });
   const macros = [
     macro('Solo (left)', { L: clicks('solo') }),
@@ -219,16 +310,10 @@ export function StageEmulator() {
   };
 
   const event = show?.event ?? null;
-  const perimeter = event?.perimeter;
-  const wash = (on: boolean) => {
-    const rgb = on && spec ? paletteRgb(spec, perimeter?.color ?? null) : null;
-    return rgb ? `rgb(${rgb.join(',')})` : undefined;
-  };
-  const lit = (...sides: (string | undefined)[]) => !!perimeter?.side && sides.includes(perimeter.side);
+  const lit = (row: string) => (litRow && litRow.row === row && performance.now() - litRow.at < GUIDE_LIT_MS ? 'lit' : undefined);
 
   const pillar = (side: Side) => (
     <div className={`emulator-pillar pillar-${side}`}>
-      <StripCanvas strip={strips[side]} orientation="vertical" className="emulator-pole" />
       {event?.thunder && <span className={`pole-role ${event.thunder.pole === side ? 'active' : ''}`}>{event.thunder.pole === side ? 'active' : 'dark'}</span>}
       <button
         type="button"
@@ -256,29 +341,35 @@ export function StageEmulator() {
 
       <div className="emulator-stage">
         {pillar('L')}
-        <svg className="emulator-tstage" viewBox="0 0 300 250" role="img" aria-label="Stage">
-          <rect x="10" y="10" width="140" height="70" className="stage-part" style={{ fill: wash(lit('L', 'both')) }} />
-          <rect x="150" y="10" width="140" height="70" className="stage-part" style={{ fill: wash(lit('R', 'both')) }} />
-          <rect x="125" y="80" width="50" height="150" className="stage-part" style={{ fill: wash(lit('centre', 'both')) }} />
-          <text x="150" y="50" textAnchor="middle" className="stage-label">stage</text>
-          <text x="150" y="245" textAnchor="middle" className="stage-label">entrance</text>
-        </svg>
+        {spec ? <StageView spec={spec} frame={frame} appliances={devices} /> : <div className="emulator-tstage" />}
         {pillar('R')}
         <aside className="press-guide" aria-label="Press guide">
           <strong>Idle</strong>
-          <span>1 tap · solo</span>
-          <span>both {clicks('duet')}+{clicks('duet')} · duet</span>
-          <span>both {clicks('showoff')}+{clicks('showoff')} · showoff</span>
-          <span>both {clicks('thunder')}+{clicks('thunder')} · thunder</span>
-          <span>counts differ · fail blink</span>
+          <span className={lit('idle-1')}>1 tap · solo</span>
+          <span className={lit(`idle-${clicks('duet')}`)}>both {clicks('duet')}+{clicks('duet')} · duet</span>
+          <span className={lit(`idle-${clicks('showoff')}`)}>both {clicks('showoff')}+{clicks('showoff')} · showoff</span>
+          <span className={lit(`idle-${clicks('thunder')}`)}>both {clicks('thunder')}+{clicks('thunder')} · thunder</span>
+          <span className={lit('idle-4')}>counts differ · fail blink</span>
           <strong>In song</strong>
-          <span>2 taps · claps (thunder: dark pole)</span>
-          <span>3 taps · special</span>
-          <span>4 taps · skip (to mid verse 2)</span>
-          <span>1 tap · thunder tag (active pole)</span>
-          <span>hold · stop</span>
+          <span className={lit('claps')}>2 taps · claps (thunder: dark pole)</span>
+          <span className={lit('special')}>3 taps · special</span>
+          <span className={lit('skip')}>4 taps · skip (until mid verse 2)</span>
+          <span className={lit('tag')}>1 tap · thunder tag (active pole)</span>
+          <span className={lit('stop')}>hold · stop</span>
         </aside>
       </div>
+
+      <section className="emulator-card emulator-feed">
+        <div className="emulator-log-header">
+          <h3>Controller feed</h3>
+          {feed.length > 0 && <button type="button" onClick={() => setFeed([])}>Clear</button>}
+        </div>
+        {feed.length === 0 ? <p className="emulator-note">Every press, and what the controller did in reply, newest first.</p> : (
+          <ol className="emulator-log" aria-label="Controller feed, newest first">
+            {feed.map(l => <li key={l.id} className={`feed-${l.kind}`}><span>{l.time.toLocaleTimeString()}</span>{l.text}</li>)}
+          </ol>
+        )}
+      </section>
 
       {songId !== null && songMap?.songId === songId && player && (
         <Timeline map={songMap.map} spec={spec} time={player.current_time} duration={player.duration} />
@@ -291,7 +382,7 @@ export function StageEmulator() {
             {macros.map(m => (
               <button key={m.label} type="button" onClick={m.run} disabled={!spec}>{m.label}</button>
             ))}
-            <button type="button" className="stop" onClick={() => send('L', 'long press', 'stop', LONG_PRESS_MS)}>Stop</button>
+            <button type="button" className="stop" onClick={() => send('L', null, 'stop', LONG_PRESS_MS)}>Stop</button>
           </div>
           {/* Both pillar buttons at the same instant: tap counts launch duet/showoff/thunder, hold stops */}
           <button
@@ -304,7 +395,7 @@ export function StageEmulator() {
           >
             Both pressed
           </button>
-          <p className="emulator-note">{lastPress || 'Hold a pillar button to stop; tap it to launch.'}</p>
+          <p className="emulator-note">N quick clicks = N taps, hold = stop.</p>
         </section>
 
         <section className="emulator-card">
@@ -343,17 +434,6 @@ export function StageEmulator() {
           </ul>
         </section>
 
-        <section className="emulator-card">
-          <div className="emulator-log-header">
-            <h3>Events</h3>
-            {log.length > 0 && <button type="button" onClick={clearLog}>Clear</button>}
-          </div>
-          <ul className="emulator-log">
-            {log.map(l => (
-              <li key={l.id}><span>{l.time.toLocaleTimeString()}</span>{l.text}</li>
-            ))}
-          </ul>
-        </section>
       </div>
     </div>
   );

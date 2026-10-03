@@ -13,6 +13,7 @@ from functools import partial
 from app.features.buttons.rules import IDLE_TAPS, IN_SONG
 
 from . import events, tunables
+from .scene import scene_for
 from . import analytics
 from .launch import LaunchArbiter, LaunchResult
 from .models import ShowTunable
@@ -86,6 +87,23 @@ class StagePlayer:
             db.close()
 
 
+    async def apply_scene(self, section: str | None) -> None:
+        """Switch the section's appliances (scene.SECTION_SCENE)."""
+        from app.core.database import SessionLocal
+        from app.features.devices.models import Device
+        from app.features.devices.service import set_device_state, update_device_state
+
+        db = SessionLocal()
+        try:
+            devices = db.query(Device).all()
+            for name, on in scene_for(section, [d.name for d in devices]).items():
+                device = next(d for d in devices if d.name == name)
+                if device.is_on != on and await set_device_state(device.ip_address, on):
+                    update_device_state(db, device.id, on)
+        finally:
+            db.close()
+
+
 async def _broadcast(event) -> None:
     from app.features.buttons.router import manager
     await manager.broadcast(event)
@@ -107,6 +125,7 @@ class ShowDirector:
         self._arbiter = LaunchArbiter()
         self._poles: dict[str, Pole] = {}
         self._timeline: list[tuple[int, object]] = []  # (due_ms, async callable), in due order
+        self._background: set[asyncio.Task] = set()
         self.state = "idle"
         self.game: str | None = None
 
@@ -260,13 +279,29 @@ class ShowDirector:
         key = (section, turn, frame and (frame.phase, frame.beat))
         if key != self._key:
             was_tag = bool(self._key and self._key[2] and self._key[2][0] == "tag")
+            new_section = not self._key or self._key[0] != section
             self._key = key
             await self._emit(events.playing(self.game, status.id, section, turn, status.t, frame))
             if frame and frame.phase == "tag" and not was_tag:
-                await self._player.run_action("special")  # the smoke puff; scene design comes later
+                # the smoke puff; scene design comes later. In the background: the special sequence may
+                # wait between its steps, and the show must keep ticking through the blackout meanwhile
+                self._background_run(self._player.run_action("special"))
+                await asyncio.sleep(0)  # let it start now
+            if new_section:
+                self._background_run(self._scene(section))
+                await asyncio.sleep(0)
         if self._thunder:
             for w in self._thunder.to_log(status.t):
                 self._log("window", **w.record(status.id, self._map.bpm))
+
+    async def _scene(self, section) -> None:
+        """The section's appliances; off the tick, a real plug may take seconds to answer."""
+        await self._player.apply_scene(section[0] if section else None)
+
+    def _background_run(self, coro) -> None:
+        task = asyncio.ensure_future(coro)
+        self._background.add(task)
+        task.add_done_callback(self._background.discard)
 
     async def _after_skip(self) -> None:
         self._end_song("skip")

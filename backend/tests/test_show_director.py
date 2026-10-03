@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from app.features.show import tunables
+from app.features.show.scene import scene_for
 from app.features.show.service import ShowDirector, SongStatus
 from app.features.show.songmap import SongMap
 
@@ -28,6 +29,10 @@ class FakePlayer:
         self.map = SongMap(None, [], [])
         self.started: list[str] = []
         self.actions: list[str] = []
+        self.devices = {"floodLights (x2)": False, "spotlights": False, "smoke": False}
+
+    async def apply_scene(self, section):
+        self.devices.update(scene_for(section, list(self.devices)))
 
     async def start_game(self, game):
         self.started.append(game)
@@ -510,3 +515,41 @@ def test_a_window_cut_short_by_stop_is_still_logged():
     play_song(rig, 127.5)
     rig.press("stop", "L")
     assert [f["outcome"] for f in kinds(rig, "window")] == ["none"]
+
+
+def test_thunder_tag_smoke_does_not_hold_up_the_show():
+    """The special sequence waits between its steps; the blackout and the new look must not wait for it."""
+    import time
+    rig = play_thunder("L")
+    play_song(rig, 127.0)
+    rig.press("start", "L", ago=400)
+    started = []
+
+    async def slow(action):
+        started.append(action)
+        await asyncio.sleep(5)
+
+    rig.player.run_action = slow
+    t0 = time.monotonic()
+    play_song(rig, 130)
+    assert time.monotonic() - t0 < 4
+    assert started == ["special"]
+    assert [e.thunder.phase for e in thunder_events(rig)][-2:] == ["tag", "new_look"]
+
+
+@pytest.mark.parametrize("t, flood, spot", [
+    (70.0, False, True),    # verse 1
+    (128.0, True, False),   # chorus 1
+    (136.0, False, False),  # instrumental
+    (250.0, False, False),  # outro
+])
+def test_section_scene_floodlights_in_choruses_spotlights_in_verses(t, flood, spot):
+    rig = Rig()
+    play_game(rig, "claps")  # duet
+    seek(rig, t)
+    assert rig.player.devices == {"floodLights (x2)": flood, "spotlights": spot, "smoke": False}
+
+
+def test_scene_matches_names_by_prefix_case_insensitively():
+    assert scene_for("chorus", ["FloodLights (x2)", "spotlights", "bubbles"]) == {"FloodLights (x2)": True, "spotlights": False}
+    assert scene_for(None, ["floodLights (x2)"]) == {"floodLights (x2)": False}

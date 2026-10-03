@@ -76,6 +76,11 @@ last section is `both` -- with `perimeter = {look: "turn", color: lime | blue | 
 Other games send `turn: null`. A turn event is sent at the section boundary (within one ~20 ms
 tick), not ahead of it. Fields already in the schema are stable; unknown fields must be ignored.
 
+Section scene: on each section change the controller itself switches the appliances --
+`floodLights*` on in a `chorus`, `spotlights*` on in a `verse`, both off in every other section
+(names matched case-insensitively by prefix; `backend/app/features/show/scene.py`). This adds no
+show-event field: the switching shows up in the devices API (`is_on`) like any other device change.
+
 ### Thunder
 
 At the end of verses 2..N-1 a thunder game sends one `playing` event **per beat** with

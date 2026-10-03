@@ -14,6 +14,7 @@ from app.features.buttons.rules import IDLE_TAPS, IN_SONG
 from . import events, tunables
 from . import analytics
 from .launch import LaunchArbiter, LaunchResult
+from .models import ShowTunable
 from .schemas import Pole
 from .songmap import SongMap
 
@@ -254,6 +255,23 @@ class ShowDirector:
 
     def _ignored(self, action, reason) -> dict:
         return {"status": "ignored", "action": action, "reason": reason, "show_state": self.state}
+
+
+def load_tunables(db) -> None:
+    """Apply the saved tunable overrides (at startup)."""
+    for row in db.query(ShowTunable).all():
+        if row.id in tunables.defaults():  # a tunable dropped from the spec is ignored
+            tunables.set_override(row.id, row.value)
+
+
+def save_tunable(db, tunable_id: str, value) -> None:
+    row = db.get(ShowTunable, tunable_id)
+    if row:
+        row.value = value
+    else:
+        db.add(ShowTunable(id=tunable_id, value=value))
+    db.commit()
+    tunables.set_override(tunable_id, value)
 
 
 director = ShowDirector(StagePlayer(), Clock(), _broadcast, analytics.append)

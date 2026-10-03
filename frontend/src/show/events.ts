@@ -28,6 +28,7 @@ export interface ShowEvent {
 /** The part of the stage spec the emulator needs (GET /api/show/spec). */
 export interface ShowSpec {
   palette: Record<string, { ramp: number[][] }>;
+  tunables?: { id: string; value: unknown }[];
   games: { id: string; start: { buttons: number; clicks: number } }[];
 }
 
@@ -43,16 +44,22 @@ export function paletteRgb(spec: ShowSpec, name: string | null): Rgb | null {
   return ramp ? (ramp[1] as Rgb) : null;
 }
 
-/** One pole strip for a show event's pole, `elapsedMs` after the event arrived. LED 0 is the bottom. */
-export function polePixels(pole: Pole, rgb: Rgb | null, elapsedMs: number): Strip {
-  const out = blankStrip();
-  if (pole.mode === 'off' || !rgb) return out;
-
+/** How full and how bright a show event's pole is `elapsedMs` after the event arrived (pct 0 when off). */
+export function poleState(pole: Pole, elapsedMs: number): { pct: number; level: number } {
+  if (pole.mode === 'off') return { pct: 0, level: 0 };
   let pct = pole.pct;
   let level = 1;
   if (pole.mode === 'drain' && pole.ms) pct *= Math.max(0, 1 - elapsedMs / pole.ms);
   if (pole.mode === 'blink') level = Math.floor(elapsedMs / BLINK_MS) % 2 === 0 ? 1 : 0;
   if (pole.mode === 'pulse') level = 0.65 + 0.35 * Math.sin((elapsedMs / (pole.ms || PULSE_MS)) * 2 * Math.PI);
+  return { pct, level };
+}
+
+/** One pole strip for a show event's pole, `elapsedMs` after the event arrived. LED 0 is the bottom. */
+export function polePixels(pole: Pole, rgb: Rgb | null, elapsedMs: number): Strip {
+  const out = blankStrip();
+  if (pole.mode === 'off' || !rgb) return out;
+  const { pct, level } = poleState(pole, elapsedMs);
 
   const lit = Math.round((pct / 100) * PIXEL_COUNT);
   for (let i = 0; i < lit; i++) {

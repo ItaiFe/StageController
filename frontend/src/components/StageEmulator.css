@@ -60,23 +60,36 @@
 }
 
 .press-guide strong { color: var(--accent); margin-top: 0.3rem; }
+.press-guide .lit { color: #fff; font-weight: 600; }
+
+.emulator-feed { margin: 0.75rem 0; }
+.emulator-feed .emulator-log { max-height: 16rem; list-style: none; padding: 0; }
+.emulator-feed .feed-press { color: var(--text); font-weight: 600; }
 
 .emulator-tstage {
-  width: min(440px, 50%);
+  width: min(520px, 60%);
   align-self: center;
+  background: #050305;
+  border-radius: 16px;
 }
 
-.stage-part {
-  fill: #261a1f;
-  stroke: var(--border);
-  stroke-width: 2;
-  transition: fill 0.12s;
-}
-
-.stage-label {
-  fill: var(--text-muted);
-  font-size: 12px;
-}
+.tstage-body { fill: #0a070a; stroke: #ff1493; stroke-opacity: 0.5; stroke-width: 3; stroke-dasharray: 2 9; stroke-linecap: round; }
+.emulator-tstage .stage-label { fill: #8a7886; font: 700 30px sans-serif; }
+.emulator-tstage .stage-label.big { font-size: 56px; fill: #2a1a24; }
+.emulator-tstage .led { fill: rgb(30, 22, 28); }
+.emulator-tstage .seg { fill: #1a1318; }
+.emulator-tstage .pct { fill: #fff; font: 700 28px ui-monospace, monospace; }
+.emulator-tstage .lamp { fill: #130d11; stroke: #51394a; stroke-width: 3; }
+.emulator-tstage .lamp.on { fill: #ffe9c8; stroke: #ffe9c8; }
+.emulator-tstage .puff { fill: #fff; }
+.appliance .fixture { fill: #2a1f26; stroke: #51394a; stroke-width: 2; }
+.appliance .glow { fill: #fff3c4; opacity: 0; }
+.appliance .cloud { fill: #d9d4dc; opacity: 0.45; }
+.appliance .bubble { fill: none; stroke: #9be7ff; stroke-width: 2; }
+.appliance.on .fixture { fill: #fff3c4; stroke: #fff3c4; }
+.appliance.on .glow { opacity: 0.3; }
+.appliance-label { fill: #6d5a67; font: 600 15px sans-serif; }
+.appliance.on .appliance-label { fill: #fff3c4; }
 
 .emulator-pillar {
   display: flex;

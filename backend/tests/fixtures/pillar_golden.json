@@ -1,0 +1,2482 @@
+{
+ "loop": true,
+ "steps": [
+  {
+   "kind": "effect",
+   "effect": "comet",
+   "duration_ms": 2100,
+   "brightness": 255,
+   "direction": "bounce",
+   "speed": 1.5,
+   "colors": [
+    "#FF00C0",
+    "#00E5FF",
+    "#FFB000"
+   ]
+  },
+  {
+   "kind": "effect",
+   "effect": "band",
+   "duration_ms": 500,
+   "brightness": 200,
+   "direction": "down",
+   "speed": 0.25,
+   "colors": [
+    "#00FFFF"
+   ]
+  },
+  {
+   "kind": "effect",
+   "effect": "rainbow",
+   "duration_ms": 20480,
+   "brightness": 255,
+   "direction": "up",
+   "speed": 4.0,
+   "colors": []
+  },
+  {
+   "kind": "frame",
+   "duration_ms": 300,
+   "transition": {
+    "type": "cut",
+    "ms": 0,
+    "direction": "up"
+   },
+   "pixels": [
+    {
+     "color": "#00FF00",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#02FD25",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#05FA4A",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#07F86F",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0AF594",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0CF3B9",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0FF0DE",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#12ED03",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#14EB28",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#17E84D",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#19E672",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#1CE397",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#1EE1BC",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#21DEE1",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#24DB06",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#26D92B",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#29D650",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#2BD475",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#2ED19A",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#30CFBF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#33CCE4",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#36C909",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#38C72E",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#3BC453",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#3DC278",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#40BF9D",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#42BDC2",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#45BAE7",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#48B70C",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#4AB531",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#4DB256",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#4FB07B",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#52ADA0",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#55AAC5",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#57A8EA",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#5AA50F",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#5CA334",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#5FA059",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#619E7E",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#649BA3",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#6798C8",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#6996ED",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#6C9312",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#6E9137",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#718E5C",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#738C81",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#7689A6",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#7986CB",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#7B84F0",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#7E8115",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#807F3A",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#837C5F",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#857A84",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#8877A9",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#8B74CE",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#8D72F3",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#906F18",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#926D3D",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#956A62",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#976887",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#9A65AC",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#9D62D1",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#9F60F6",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#A25D1B",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#A45B40",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#A75865",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#AA558A",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#AC53AF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#AF50D4",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#B14EF9",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#B44B1E",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#B64943",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#B94668",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#BC438D",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#BE41B2",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#C13ED7",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#C33CFC",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#C63921",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#C83746",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#CB346B",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#CE3190",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#D02FB5",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#D32CDA",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#D52AFF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#D82724",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#DA2549",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#DD226E",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#E01F93",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#E21DB8",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#E51ADD",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#E71802",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#EA1527",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#EC134C",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#EF1071",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#F20D96",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#F40BBB",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#F708E0",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#F90605",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FC032A",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF004F",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    }
+   ]
+  },
+  {
+   "kind": "frame",
+   "duration_ms": 800,
+   "transition": {
+    "type": "crossfade",
+    "ms": 400,
+    "direction": "up"
+   },
+   "pixels": [
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FF8040",
+     "brightness": 128,
+     "fade_ms": 0,
+     "delay_ms": 0
+    }
+   ]
+  },
+  {
+   "kind": "frame",
+   "duration_ms": 400,
+   "transition": {
+    "type": "wipe",
+    "ms": 400,
+    "direction": "up"
+   },
+   "pixels": [
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#0000FF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    }
+   ]
+  },
+  {
+   "kind": "frame",
+   "duration_ms": 1000,
+   "transition": {
+    "type": "custom",
+    "ms": 0,
+    "direction": "up"
+   },
+   "pixels": [
+    {
+     "color": "#FFFFFF",
+     "brightness": 255,
+     "fade_ms": 0,
+     "delay_ms": 0
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 254,
+     "fade_ms": 5,
+     "delay_ms": 4
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 253,
+     "fade_ms": 10,
+     "delay_ms": 8
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 252,
+     "fade_ms": 15,
+     "delay_ms": 12
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 251,
+     "fade_ms": 20,
+     "delay_ms": 16
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 250,
+     "fade_ms": 25,
+     "delay_ms": 20
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 249,
+     "fade_ms": 30,
+     "delay_ms": 24
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 248,
+     "fade_ms": 35,
+     "delay_ms": 28
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 247,
+     "fade_ms": 40,
+     "delay_ms": 32
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 246,
+     "fade_ms": 45,
+     "delay_ms": 36
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 245,
+     "fade_ms": 50,
+     "delay_ms": 40
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 244,
+     "fade_ms": 55,
+     "delay_ms": 44
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 243,
+     "fade_ms": 60,
+     "delay_ms": 48
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 242,
+     "fade_ms": 65,
+     "delay_ms": 52
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 241,
+     "fade_ms": 70,
+     "delay_ms": 56
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 240,
+     "fade_ms": 75,
+     "delay_ms": 60
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 239,
+     "fade_ms": 80,
+     "delay_ms": 64
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 238,
+     "fade_ms": 85,
+     "delay_ms": 68
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 237,
+     "fade_ms": 90,
+     "delay_ms": 72
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 236,
+     "fade_ms": 95,
+     "delay_ms": 76
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 235,
+     "fade_ms": 100,
+     "delay_ms": 80
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 234,
+     "fade_ms": 105,
+     "delay_ms": 84
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 233,
+     "fade_ms": 110,
+     "delay_ms": 88
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 232,
+     "fade_ms": 115,
+     "delay_ms": 92
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 231,
+     "fade_ms": 120,
+     "delay_ms": 96
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 230,
+     "fade_ms": 125,
+     "delay_ms": 100
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 229,
+     "fade_ms": 130,
+     "delay_ms": 104
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 228,
+     "fade_ms": 135,
+     "delay_ms": 108
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 227,
+     "fade_ms": 140,
+     "delay_ms": 112
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 226,
+     "fade_ms": 145,
+     "delay_ms": 116
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 225,
+     "fade_ms": 150,
+     "delay_ms": 120
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 224,
+     "fade_ms": 155,
+     "delay_ms": 124
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 223,
+     "fade_ms": 160,
+     "delay_ms": 128
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 222,
+     "fade_ms": 165,
+     "delay_ms": 132
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 221,
+     "fade_ms": 170,
+     "delay_ms": 136
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 220,
+     "fade_ms": 175,
+     "delay_ms": 140
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 219,
+     "fade_ms": 180,
+     "delay_ms": 144
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 218,
+     "fade_ms": 185,
+     "delay_ms": 148
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 217,
+     "fade_ms": 190,
+     "delay_ms": 152
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 216,
+     "fade_ms": 195,
+     "delay_ms": 156
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 215,
+     "fade_ms": 200,
+     "delay_ms": 160
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 214,
+     "fade_ms": 205,
+     "delay_ms": 164
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 213,
+     "fade_ms": 210,
+     "delay_ms": 168
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 212,
+     "fade_ms": 215,
+     "delay_ms": 172
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 211,
+     "fade_ms": 220,
+     "delay_ms": 176
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 210,
+     "fade_ms": 225,
+     "delay_ms": 180
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 209,
+     "fade_ms": 230,
+     "delay_ms": 184
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 208,
+     "fade_ms": 235,
+     "delay_ms": 188
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 207,
+     "fade_ms": 240,
+     "delay_ms": 192
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 206,
+     "fade_ms": 245,
+     "delay_ms": 196
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 205,
+     "fade_ms": 250,
+     "delay_ms": 200
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 204,
+     "fade_ms": 255,
+     "delay_ms": 204
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 203,
+     "fade_ms": 260,
+     "delay_ms": 208
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 202,
+     "fade_ms": 265,
+     "delay_ms": 212
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 201,
+     "fade_ms": 270,
+     "delay_ms": 216
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 200,
+     "fade_ms": 275,
+     "delay_ms": 220
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 199,
+     "fade_ms": 280,
+     "delay_ms": 224
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 198,
+     "fade_ms": 285,
+     "delay_ms": 228
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 197,
+     "fade_ms": 290,
+     "delay_ms": 232
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 196,
+     "fade_ms": 295,
+     "delay_ms": 236
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 195,
+     "fade_ms": 300,
+     "delay_ms": 240
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 194,
+     "fade_ms": 305,
+     "delay_ms": 244
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 193,
+     "fade_ms": 310,
+     "delay_ms": 248
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 192,
+     "fade_ms": 315,
+     "delay_ms": 252
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 191,
+     "fade_ms": 320,
+     "delay_ms": 256
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 190,
+     "fade_ms": 325,
+     "delay_ms": 260
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 189,
+     "fade_ms": 330,
+     "delay_ms": 264
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 188,
+     "fade_ms": 335,
+     "delay_ms": 268
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 187,
+     "fade_ms": 340,
+     "delay_ms": 272
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 186,
+     "fade_ms": 345,
+     "delay_ms": 276
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 185,
+     "fade_ms": 350,
+     "delay_ms": 280
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 184,
+     "fade_ms": 355,
+     "delay_ms": 284
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 183,
+     "fade_ms": 360,
+     "delay_ms": 288
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 182,
+     "fade_ms": 365,
+     "delay_ms": 292
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 181,
+     "fade_ms": 370,
+     "delay_ms": 296
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 180,
+     "fade_ms": 375,
+     "delay_ms": 300
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 179,
+     "fade_ms": 380,
+     "delay_ms": 304
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 178,
+     "fade_ms": 385,
+     "delay_ms": 308
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 177,
+     "fade_ms": 390,
+     "delay_ms": 312
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 176,
+     "fade_ms": 395,
+     "delay_ms": 316
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 175,
+     "fade_ms": 400,
+     "delay_ms": 320
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 174,
+     "fade_ms": 405,
+     "delay_ms": 324
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 173,
+     "fade_ms": 410,
+     "delay_ms": 328
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 172,
+     "fade_ms": 415,
+     "delay_ms": 332
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 171,
+     "fade_ms": 420,
+     "delay_ms": 336
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 170,
+     "fade_ms": 425,
+     "delay_ms": 340
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 169,
+     "fade_ms": 430,
+     "delay_ms": 344
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 168,
+     "fade_ms": 435,
+     "delay_ms": 348
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 167,
+     "fade_ms": 440,
+     "delay_ms": 352
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 166,
+     "fade_ms": 445,
+     "delay_ms": 356
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 165,
+     "fade_ms": 450,
+     "delay_ms": 360
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 164,
+     "fade_ms": 455,
+     "delay_ms": 364
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 163,
+     "fade_ms": 460,
+     "delay_ms": 368
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 162,
+     "fade_ms": 465,
+     "delay_ms": 372
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 161,
+     "fade_ms": 470,
+     "delay_ms": 376
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 160,
+     "fade_ms": 475,
+     "delay_ms": 380
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 159,
+     "fade_ms": 480,
+     "delay_ms": 384
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 158,
+     "fade_ms": 485,
+     "delay_ms": 388
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 157,
+     "fade_ms": 490,
+     "delay_ms": 392
+    },
+    {
+     "color": "#FFFFFF",
+     "brightness": 156,
+     "fade_ms": 495,
+     "delay_ms": 396
+    }
+   ]
+  }
+ ]
+}

@@ -128,7 +128,8 @@ class MusicPlayer:
 
         @self._player.property_observer('pause')
         def pause_observer(_name, value):
-            self._state.is_playing = not value
+            # mpv starts unpaused with nothing loaded; that isn't "playing"
+            self._state.is_playing = not value and self._state.current_song_id is not None
             if self._on_state_change and _main_loop:
                 _main_loop.call_soon_threadsafe(
                     lambda: asyncio.create_task(self._on_state_change())

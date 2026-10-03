@@ -9,4 +9,5 @@ export { StageControl, AddDeviceModal, SequenceModal } from './StageControl';
 export { SequenceFlowChart } from './SequenceFlowChart';
 export { StatsPage } from './StatsPage';
 export { ButtonTestPage } from './ButtonTestPage';
+export { PillarPage } from './pillar/PillarPage';
 export { MusicEditor } from './MusicEditor';

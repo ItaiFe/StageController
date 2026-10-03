@@ -356,9 +356,10 @@
 }
 
 .sequence-modal.flowchart-modal {
-  max-width: 900px;
-  width: 90vw;
-  height: 85vh;
+  max-width: 1400px;
+  width: 95vw;
+  height: 92vh;
+  max-height: 92vh;
   display: flex;
   flex-direction: column;
 }

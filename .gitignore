@@ -17,3 +17,6 @@ data/music/
 
 # macOS
 .DS_Store
+
+# Brainstorming mockups
+.superpowers/

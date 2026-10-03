@@ -1,4 +1,5 @@
 import type { ButtonAction } from './buttonGesture';
+import type { Sequence as PillarSequence, Slot } from './pillar/types';
 
 const API_BASE = import.meta.env.DEV ? 'http://localhost:8000/api' : '/api';
 
@@ -379,4 +380,60 @@ export const buttonsApi = {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   },
+};
+
+// Pillar LED plans (docs/pillar-led-contract.md)
+export interface PillarStatus {
+  plans_version: number;
+  preview_id: number;
+  pillar_seen_s_ago: number | null;
+  pillar_running_version: number | null;
+}
+
+/** A rejected save: a message per step index (-1 = whole sequence). */
+export class PillarValidationError extends Error {
+  stepErrors: Record<number, string>;
+
+  constructor(stepErrors: Record<number, string>) {
+    super(Object.values(stepErrors).join('; '));
+    this.stepErrors = stepErrors;
+  }
+}
+
+interface FastApiError {
+  loc?: (string | number)[];
+  msg?: string;
+}
+
+async function pillarRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_BASE}/pillar${path}`, {
+    headers: init?.body ? { 'Content-Type': 'application/json' } : undefined,
+    ...init,
+  });
+  if (res.status === 422) {
+    const body = await res.json();
+    const stepErrors: Record<number, string> = {};
+    for (const e of (body.detail ?? []) as FastApiError[]) {
+      const msg = (e.msg ?? 'Invalid').replace(/^Value error, /, '');
+      const fromLoc = e.loc?.[1] === 'steps' && typeof e.loc[2] === 'number' ? e.loc[2] : undefined;
+      const fromMsg = msg.match(/^Step (\d+):/);
+      const index = fromLoc ?? (fromMsg ? Number(fromMsg[1]) - 1 : -1);
+      stepErrors[index] = stepErrors[index] ?? msg.replace(/^Step \d+: /, '');
+    }
+    throw new PillarValidationError(stepErrors);
+  }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export const pillarApi = {
+  getPlans: () => pillarRequest<{ version: number; slots: Record<Slot, PillarSequence | null> }>('/plans'),
+  getDefaults: () => pillarRequest<Record<Slot, PillarSequence>>('/plans/defaults'),
+  save: (slot: Slot, seq: PillarSequence) =>
+    pillarRequest<{ version: number }>(`/plans/${slot}`, { method: 'PUT', body: JSON.stringify(seq) }),
+  reset: (slot: Slot) => pillarRequest<{ version: number }>(`/plans/${slot}`, { method: 'DELETE' }),
+  startPreview: (seq: PillarSequence) =>
+    pillarRequest<{ preview_id: number }>('/preview', { method: 'POST', body: JSON.stringify(seq) }),
+  stopPreview: () => pillarRequest<{ preview_id: number }>('/preview', { method: 'DELETE' }),
+  status: () => pillarRequest<PillarStatus>('/status'),
 };

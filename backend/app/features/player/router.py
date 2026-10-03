@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.features.songs.models import Song
 from app.features.playlists.services import get_playlist, get_playlist_songs
+from app.features.pillar import service as pillar
 from .service import player
 
 router = APIRouter(prefix="/player", tags=["player"])
@@ -28,9 +29,16 @@ class VolumeRequest(BaseModel):
 
 
 @router.get("/state")
-def get_state():
-    """Get current player state."""
-    return player.get_state()
+def get_state(client: str | None = None, running_version: int | None = None, db: Session = Depends(get_db)):
+    """Get current player state, plus what the pillar ESP watches (it polls this every second
+    as ?client=pillar&running_version=N)."""
+    if client == "pillar":
+        pillar.pillar_status.record_poll(running_version)
+    return {
+        **player.get_state(),
+        "pillar_plans_version": pillar.get_version(db),
+        "pillar_preview_id": pillar.preview.current_id(),
+    }
 
 
 @router.post("/play/song")

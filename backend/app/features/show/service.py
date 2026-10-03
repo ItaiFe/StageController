@@ -4,6 +4,7 @@ All time comes from the injected clock and the player behind a small adapter, so
 whole launches instantly without mpv or a database. The real adapter is StagePlayer.
 """
 import asyncio
+import random
 import time
 from dataclasses import dataclass
 from functools import partial
@@ -16,6 +17,7 @@ from .launch import LaunchArbiter, LaunchResult
 from .models import ShowTunable
 from .schemas import Pole
 from .songmap import SongMap
+from .thunder import Thunder
 
 TICK_S = 0.02
 # analytics press kind by in-song meaning (anything else is "ordinary")
@@ -89,8 +91,10 @@ async def _broadcast(event) -> None:
 
 
 class ShowDirector:
-    def __init__(self, player, clock, emit, log=None):
+    def __init__(self, player, clock, emit, log=None, rng=None):
         self._player = player
+        self._rng = rng or random.Random()
+        self._thunder: Thunder | None = None
         self._clock = clock
         self._emit = emit
         self._log_to = log
@@ -98,7 +102,7 @@ class ShowDirector:
         self._song_id: int | None = None
         self._song_started_ms = 0
         self._t = 0.0  # song time at the last tick
-        self._key = None  # (section, turn) of the last playing event
+        self._key = None  # (section, turn, thunder phase and beat) of the last playing event
         self._arbiter = LaunchArbiter()
         self._poles: dict[str, Pole] = {}
         self._timeline: list[tuple[int, object]] = []  # (due_ms, async callable), in due order
@@ -128,6 +132,19 @@ class ShowDirector:
         if self.state != "playing":
             return self._ignored(action, self.state)
         what = IN_SONG[action]
+        if self._thunder and (status := self._player.status()):
+            # the pillar reports a gesture after its release: the press was first_press_ago_ms earlier
+            kind = self._thunder.press(side, what, status.t - first_press_ago_ms / 1000, status.t)
+            if kind == "blocked":
+                self._log("press", side=side, kind="ordinary")
+                return self._ignored(action, "active_pole")
+            if kind:
+                self._log("press", side=side, kind=kind)
+                if kind == "dark":
+                    await self._player.run_action("claps")
+                else:
+                    await self._follow(status)  # early falls now; both log their window
+                return self._ok(action, side)
         if what == "skip" and (status := self._player.status()) and status.t > self._map.skip_cutoff_s():
             self._log("press", side=side, kind="ordinary")
             return self._ignored(action, "after_cutoff")
@@ -217,6 +234,7 @@ class ShowDirector:
         self._song_started_ms = self._clock.now_ms()
         self._key = None
         self._map = self._player.song_map()
+        self._thunder = Thunder(self._map, self._rng) if self.game == "thunder" else None
         self._log("song_start", songId=str(song_id), game=self.game, bpm=self._map.bpm,
                   hasSections=self._map.has_markers, hasBeats=bool(self._map.beats))
         if not self._map.has_markers:
@@ -225,13 +243,25 @@ class ShowDirector:
             await self._follow(status)
 
     async def _follow(self, status: SongStatus) -> None:
-        """One playing event whenever the section or the showoff turn changes."""
+        """One playing event whenever the section, the showoff turn or the thunder beat changes."""
+        if status.id != self._song_id:  # changed under us (web UI Next): a new song needs its own map
+            self._end_song("skip")
+            await self._begin_song(status.id)
+            return
         self._t = status.t
         section = self._map.section_at(status.t)
         turn = self._map.turn_owner(status.t, status.duration) if self.game == "showoff" else None
-        if (section, turn) != self._key:
-            self._key = (section, turn)
-            await self._emit(events.playing(self.game, status.id, section, turn, status.t))
+        frame = self._thunder.frame(status.t) if self._thunder else None
+        key = (section, turn, frame and (frame.phase, frame.beat))
+        if key != self._key:
+            was_tag = bool(self._key and self._key[2] and self._key[2][0] == "tag")
+            self._key = key
+            await self._emit(events.playing(self.game, status.id, section, turn, status.t, frame))
+            if frame and frame.phase == "tag" and not was_tag:
+                await self._player.run_action("special")  # the smoke puff; scene design comes later
+        if self._thunder:
+            for w in self._thunder.to_log(status.t):
+                self._log("window", **w.record(status.id, self._map.bpm))
 
     async def _after_skip(self) -> None:
         self._end_song("skip")
@@ -241,6 +271,7 @@ class ShowDirector:
             await self.to_idle()
 
     def _end_song(self, reason: str) -> None:
+        self._thunder = None
         if self._song_id is None:
             return
         self._log("song_end", songId=str(self._song_id), game=self.game, reason=reason,

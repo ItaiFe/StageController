@@ -46,8 +46,17 @@ class FakePlayer:
             self.loaded = False
 
 
+class Pick:
+    """RNG stub: every thunder window goes to this pole."""
+    def __init__(self, side):
+        self.side = side
+
+    def choice(self, options):
+        return self.side
+
+
 class Rig:
-    def __init__(self, song_id=1):
+    def __init__(self, song_id=1, rng=None):
         self.clock = FakeClock()
         self.player = FakePlayer(song_id)
         self.events = []  # show events
@@ -57,7 +66,8 @@ class Rig:
         async def emit(event):
             (self.events if event.action == "show" else self.legacy).append((self.clock.t, event))
 
-        self.director = ShowDirector(self.player, self.clock, emit, lambda kind, mono, /, **f: self.log.append((kind, mono, f)))
+        self.director = ShowDirector(self.player, self.clock, emit, lambda kind, mono, /, **f: self.log.append((kind, mono, f)),
+                                     rng=rng)
 
     def press(self, action, side, ago=0):
         return asyncio.run(self.director.on_press(action, side, ago))
@@ -384,3 +394,95 @@ def test_missing_markers_log_a_fault_and_the_game_still_plays():
     seek(rig, 30)
     assert [e.turn for e in playing_events(rig)] == ["L", "R"]  # fallbackTurnMs = 20 s
     assert all(e.song.section is None for e in playing_events(rig))
+
+
+def play_song(rig, until):
+    """Song time runs with the clock, tick by tick."""
+    while rig.player.t < until:
+        rig.player.t = round(rig.player.t + STEP / 1000, 3)
+        rig.advance(STEP)
+
+
+def thunder_events(rig):
+    return [e for e in playing_events(rig) if e.thunder]
+
+
+def play_thunder(side="L"):
+    rig = Rig(rng=Pick(side))
+    play_game(rig, "special")
+    seek(rig, 120.0)
+    return rig
+
+
+def test_thunder_countdown_and_window_one_event_per_beat():
+    rig = play_thunder("R")
+    play_song(rig, 130)
+    got = [(e.thunder.phase, e.thunder.beat, e.thunder.pole, e.poles.R.pct, e.poles.R.mode, e.poles.L.mode)
+           for e in thunder_events(rig)]
+    assert [g[:2] for g in got] == [("build", k) for k in range(-8, -4)] + [("rush", k) for k in range(-4, 0)] + [
+        ("open", 0), ("window", 1), ("window", 2), ("window", 3)]
+    assert [g[3] for g in got] == [12, 25, 38, 50, 62, 75, 88, 100, 100, 75, 50, 25]
+    assert {g[2] for g in got} == {"R"} and {g[5] for g in got} == {"off"}
+    assert [e.song.t for e in thunder_events(rig)][0] == pytest.approx(121.951, abs=0.021)
+    assert playing_events(rig)[-1].thunder is None and playing_events(rig)[-1].poles.R.mode == "off"  # rest after
+    assert kinds(rig, "window") == [{"songId": "1", "verse": 2, "pole": "R", "outcome": "none", "pressOffsetMs": None,
+                                     "windowBeats": 4, "bpm": 103.4}]
+
+
+def test_thunder_tag_blacks_out_on_the_beat_and_puffs_smoke():
+    rig = play_thunder("L")
+    play_song(rig, 127.0)
+    assert rig.press("start", "L", ago=400)["status"] == "ok"  # pressed at 126.6, in the grace
+    assert rig.player.actions == []
+    play_song(rig, 127.26)
+    assert rig.player.actions == []  # waits for the beat after the arrival
+    play_song(rig, 127.3)
+    assert rig.player.actions == ["special"]
+    tag = thunder_events(rig)[-1]
+    assert (tag.thunder.phase, tag.thunder.beat, tag.poles.L.mode, tag.perimeter.look) == ("tag", 1, "off", "blackout")
+    play_song(rig, 130)
+    assert [e.thunder.phase for e in thunder_events(rig)][-2:] == ["tag", "new_look"]
+    assert rig.player.actions == ["special"]
+    assert [f["kind"] for f in kinds(rig, "press")] == ["tag"]
+    assert [(f["outcome"], f["pressOffsetMs"]) for f in kinds(rig, "window")] == [("tag", -65)]
+
+
+def test_thunder_early_press_falls_at_once_and_cancels_the_window():
+    rig = play_thunder("L")
+    play_song(rig, 123.0)
+    rig.press("start", "L", ago=400)
+    early = playing_events(rig)[-1]
+    assert (early.thunder.phase, early.poles.L.mode, early.poles.L.pct, early.poles.L.ms, early.perimeter.look) == (
+        "early", "drain", 25, 500, "halo")
+    play_song(rig, 130)
+    assert "open" not in [e.thunder.phase for e in thunder_events(rig)]
+    assert [f["outcome"] for f in kinds(rig, "window")] == ["early"]
+    assert [f["kind"] for f in kinds(rig, "press")] == ["early"]
+
+
+def test_thunder_only_the_dark_pole_applauds_during_the_countdown():
+    rig = play_thunder("L")
+    play_song(rig, 123.0)
+    assert rig.press("claps", "L")["reason"] == "active_pole"
+    assert rig.press("claps", "R")["status"] == "ok"
+    assert rig.player.actions == ["claps"]
+    assert [f["kind"] for f in kinds(rig, "press")] == ["ordinary", "dark"]
+
+
+def test_other_games_have_no_thunder():
+    rig = Rig(rng=Pick("L"))
+    play_game(rig, "start")
+    seek(rig, 120.0)
+    play_song(rig, 130)
+    assert thunder_events(rig) == [] and kinds(rig, "window") == []
+
+
+def test_a_song_changed_from_the_web_ui_reloads_the_song_map():
+    rig = Rig()
+    play_game(rig, "start")
+    seek(rig, 50)
+    rig.player.song_id, rig.player.map = 2, SongMap(None, [], [])
+    seek(rig, 1.0)
+    assert [(f["songId"], f["reason"]) for f in kinds(rig, "song_end")] == [("1", "skip")]
+    assert [f["songId"] for f in kinds(rig, "song_start")] == ["1", "2"]
+    assert playing_events(rig)[-1].song.id == 2 and playing_events(rig)[-1].song.section is None

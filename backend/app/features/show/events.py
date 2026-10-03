@@ -2,7 +2,7 @@
 from datetime import datetime
 
 from . import tunables
-from .schemas import Perimeter, Pole, Poles, ShowEvent, SongInfo
+from .schemas import Perimeter, Pole, Poles, ShowEvent, SongInfo, ThunderInfo
 
 OFF = Pole(pct=0, mode="off")
 
@@ -54,11 +54,16 @@ TURN_COLOR = {"L": "lime", "R": "blue", "both": "pink"}
 
 
 def playing(game: str, song_id: int, section: tuple[str, int] | None = None, turn: str | None = None,
-            t: float = 0.0) -> ShowEvent:
+            t: float = 0.0, thunder=None) -> ShowEvent:
+    """`thunder`: the thunder.Frame showing now, if any; it brings the poles and the perimeter."""
     label, index = section or (None, None)
     perimeter = Perimeter(look="turn", color=TURN_COLOR[turn], side=turn) if turn else None
-    return _event("playing", {}, game=game, song=SongInfo(id=song_id, section=label, section_index=index, t=round(t, 2)),
-                  turn=turn, perimeter=perimeter)
+    poles, info = {}, None
+    if thunder:
+        poles, perimeter = thunder.poles, thunder.perimeter
+        info = ThunderInfo(phase=thunder.phase, pole=thunder.pole, beat=thunder.beat)
+    return _event("playing", poles, game=game, song=SongInfo(id=song_id, section=label, section_index=index, t=round(t, 2)),
+                  turn=turn, perimeter=perimeter, thunder=info)
 
 
 def legacy_start(game: str):

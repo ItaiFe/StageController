@@ -95,7 +95,8 @@ def test_tag_fires_on_the_first_beat_after_the_press_arrives():
     m, th = fixture("L")
     # pressed on the change, but the pillar reports ~400 ms after the release
     assert th.press("L", "tap", 126.67, 127.07) == "tag"
-    (w,) = th.windows
+    (w,) = th.to_log(127.07)
+    assert th.to_log(130) == []
     assert w.outcome == "tag" and w.fire_s == beat(m, 1) == 127.269
     assert th.frame(127.2).phase == "open"  # the countdown runs on until the fire beat
     tag = th.frame(127.27)
@@ -178,12 +179,12 @@ def test_only_the_dark_pole_may_applaud_during_countdown_and_window():
 def test_none_is_reported_once_and_only_for_a_window_that_was_seen():
     m, th = fixture()
     th.frame(122.0)
-    assert th.closed(128.0) == []
-    (w,) = th.closed(129.1)
+    assert th.to_log(128.0) == []
+    (w,) = th.to_log(129.1)
     assert w.record(1, 103.4)["outcome"] == "none" and w.record(1, 103.4)["pressOffsetMs"] is None
-    assert th.closed(130.0) == []
+    assert th.to_log(130.0) == []
     _, th = fixture()
-    assert th.closed(200.0) == []  # seeked over it: never opened
+    assert th.to_log(200.0) == []  # seeked over it: never opened
 
 
 def test_fallback_timing_without_beats():

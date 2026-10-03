@@ -40,8 +40,9 @@ perimeter instruction.
 
 - `color`: palette name `pink | lime | blue | white` (or `null` when off). Resolve through the
   spec's palette ramps; apply the colour tunables (gain, drift) on the LED side.
-- `mode`: `solid` (hold at `pct`) | `pulse` | `blink` | `drain` (fall from `pct` to 0 over `ms`) | `off`.
-- `perimeter.side`: `L | R | both | centre`; `look`: `intro | merge`.
+- `mode`: `solid` (hold at `pct`) | `pulse` (at `pct`; `ms` = one pulse when set, else your own rate) |
+  `blink` | `drain` (fall from `pct` to 0 over `ms`) | `off`.
+- `perimeter.side`: `L | R | both | centre`; `look`: `intro | merge | turn | blackout | new_look | halo`.
 
 ## 3. States
 
@@ -73,8 +74,43 @@ bridge | instrumental | outro`, `null` when the song has no sidecar markers), `s
 Showoff only: `turn` = `L | R | both` -- verses alternate L, R, L ...; every other section and the
 last section is `both` -- with `perimeter = {look: "turn", color: lime | blue | pink, side: turn}`.
 Other games send `turn: null`. A turn event is sent at the section boundary (within one ~20 ms
-tick), not ahead of it. The `thunder` block (`phase`, `pole`, `beat`) comes with the thunder slice.
-Fields already in the schema are stable; unknown fields must be ignored.
+tick), not ahead of it. Fields already in the schema are stable; unknown fields must be ignored.
+
+### Thunder
+
+At the end of verses 2..N-1 a thunder game sends one `playing` event **per beat** with
+`thunder = {phase, pole, beat}`: `pole` is the active pole (random per window), `beat` counts from
+beat 0, the beat nearest the verse change. The active pole is white, the other pole is `off`.
+
+| `phase` | beats | active pole |
+|---|---|---|
+| `build` | `-countdownBeats .. -rushBeats-1` | `solid`, `pct` steps up 100/countdownBeats per beat (12/25/38/50 at 8 beats) |
+| `rush` | `-rushBeats .. -1` | `pulse` with `ms` = half a beat (two pulses per beat), `pct` keeps climbing to 100 |
+| `open` | `0` | 100, `solid` |
+| `window` | `1 .. W-1` | `solid`, draining 100/W per beat (75/50/25 at W = 4); at beat W the window is over |
+| `tag` | the beat the tag fires on | both `off`, `perimeter.look = "blackout"`, for half a beat |
+| `new_look` | after the blackout | both `off`, `perimeter.look = "new_look"` (scene placeholder) |
+| `early` | from the early press, for `flareBars` bars | the active pole `drain` from where it was over `earlyFallMs`, `perimeter.look = "halo"` |
+
+After the window (or the halo, or the new look) the next event has `thunder: null` (rest).
+`W` = `windowBeatsShort`, or `windowBeatsLong` when the short one would last less than
+`minWindowMs`. A song without beats uses an even grid: `countdownBeats` steps over
+`fallbackCountdownMs`, `windowBeatsShort` steps over `fallbackWindowMs`.
+
+Presses during a window (side-aware POSTs):
+
+- `start` (1 tap) on the **active** pole, pressed in `[change - graceMs, window end]` = **tag**:
+  fires at the first beat at or after the change, the press and the *arrival* of the POST. A pillar
+  reports a gesture only after it has decided the tap count (~400 ms after the release), so a tag
+  pressed on the change usually fires one beat later; that is by design, the blackout cannot land
+  before the controller knows about it. The press time is `arrival - first_press_ago_ms`, so send
+  an honest `first_press_ago_ms`. The smoke puff (the `special` device sequence) runs on the
+  blackout.
+- `start` on the active pole after the countdown started but before `change - graceMs` = **early**:
+  the `early` event goes out at once, the countdown and window are cancelled.
+- `claps` during the countdown/window: only the **dark** pole's applause counts; the active
+  pole's answers `{"status":"ignored","reason":"active_pole"}`.
+- Anything else keeps today's meaning.
 
 Skip in song is accepted until the middle of verse 2 (`skipFallbackMs` without markers); later
 skips answer `{"status":"ignored","reason":"after_cutoff"}`.

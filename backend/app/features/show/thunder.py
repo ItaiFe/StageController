@@ -148,9 +148,10 @@ class Thunder:
             return "blocked" if side == w.pole else "dark"
         return None
 
-    def closed(self, t: float) -> list[Window]:
-        """Windows that were shown, ran out without a press and are not logged yet (marks them logged)."""
-        done = [w for w in self.windows if w.seen and not w.outcome and not w.logged and t >= w.end_s]
+    def to_log(self, t: float) -> list[Window]:
+        """Windows whose outcome is known and not logged yet (marks them logged): a tag or early press
+        at once, none once a window that was shown runs out."""
+        done = [w for w in self.windows if not w.logged and (w.outcome or (w.seen and t >= w.end_s))]
         for w in done:
             w.logged = True
         return done

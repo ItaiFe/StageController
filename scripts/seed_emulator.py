@@ -57,6 +57,7 @@ def main():
     ap.add_argument("--stem", default="its_only_love")
     ap.add_argument("--title", default="It's Only Love")
     ap.add_argument("--artist", default="Bryan Adams & Tina Turner")
+    ap.add_argument("--playlists", nargs="+", default=GAMES, help="which game playlists get the song")
     args = ap.parse_args()
 
     init_db()
@@ -75,14 +76,14 @@ def main():
             song = create_song_from_file(db, audio, audio.name)
             song.title, song.artist = args.title, args.artist
             db.commit()
-        for name in GAMES:
+        for name in args.playlists:
             playlist = db.query(Playlist).filter(Playlist.name.ilike(name)).first()
             if not playlist:
                 playlist = Playlist(name=name)
                 db.add(playlist)
                 db.commit()
             add_songs_to_playlist(db, playlist.id, [song.id])
-        print(f"Seeded song {song.id} ({song.title}), playlists {', '.join(GAMES)}, "
+        print(f"Seeded song {song.id} ({song.title}), playlists {', '.join(args.playlists)}, "
               f"{len(SPEC['stage']['appliances'])} devices, sequences {', '.join(SEQUENCES)}")
     finally:
         db.close()

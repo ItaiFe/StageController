@@ -1,0 +1,836 @@
+{
+  "meta": {
+    "name": "lipsync-stage-spec",
+    "version": "2.0",
+    "date": "2026-10-02",
+    "lang": "he",
+    "note": "Source of truth for all numbers, colours and rules. Scene design (which appliance does what, when) is NOT in this file: it is the next session. Perimeter/button glow in the demos is illustration, not spec."
+  },
+  "stage": {
+    "shape": "T (crossbar = stage, stem = catwalk)",
+    "buttons": 2,
+    "buttonPlacement": "both sides of the catwalk entrance (bottom of the stem); too far apart for one person to press both",
+    "buttonLamp": "on/off only, no colour (from the meeting; unconfirmed). Pole strips carry all colour.",
+    "poles": "each button sits on top of a pole; the pole strip fills from the bottom up toward the button",
+    "sideConvention": "left/right as seen standing at the entrance facing the stage",
+    "ledSources": [
+      "poleStripLeft",
+      "poleStripRight",
+      "perimeterStrip"
+    ],
+    "appliances": [
+      "flickers",
+      "spotlights",
+      "backLights",
+      "floodLights (x2)",
+      "movingLights",
+      "smoke",
+      "bubbles"
+    ],
+    "transport": "wireless plugs",
+    "sensors": "none in v1 (no mic, no camera). The crowd claps for real."
+  },
+  "palette": {
+    "pink": {
+      "he": "ורוד קמפ",
+      "ramp": [
+        [
+          196,
+          0,
+          122
+        ],
+        [
+          255,
+          20,
+          147
+        ],
+        [
+          255,
+          106,
+          193
+        ]
+      ],
+      "role": "together, peak, camp brand. Always drifting, liveliest of the set."
+    },
+    "lime": {
+      "he": "ליים",
+      "ramp": [
+        [
+          70,
+          190,
+          0
+        ],
+        [
+          125,
+          255,
+          0
+        ],
+        [
+          205,
+          255,
+          130
+        ]
+      ],
+      "role": "left player (showoff)"
+    },
+    "blue": {
+      "he": "כחול חשמלי",
+      "ramp": [
+        [
+          12,
+          50,
+          215
+        ],
+        [
+          20,
+          80,
+          255
+        ],
+        [
+          96,
+          150,
+          255
+        ]
+      ],
+      "role": "right player (showoff)"
+    },
+    "white": {
+      "he": "לבן",
+      "ramp": [
+        [
+          190,
+          190,
+          205
+        ],
+        [
+          255,
+          255,
+          255
+        ],
+        [
+          255,
+          255,
+          255
+        ]
+      ],
+      "role": "turn the thunder, fail blink. Red is banned (clashes with pink on strips)."
+    }
+  },
+  "tunablesUi": {
+    "where": "the existing control interface (already in development), no new screen",
+    "mandatory": [
+      "syncWindowMs",
+      "soloWaitMs",
+      "matchMaxCount"
+    ]
+  },
+  "games": [
+    {
+      "id": "solo",
+      "he": "סולו",
+      "start": {
+        "buttons": 1,
+        "clicks": 1
+      },
+      "playlist": "solo",
+      "inSong": "existing solo behaviour, unchanged; never a two-voice song"
+    },
+    {
+      "id": "duet",
+      "he": "דואט",
+      "start": {
+        "buttons": 2,
+        "clicks": 1
+      },
+      "playlist": "duet",
+      "inSong": "regular stage; must end with both singing"
+    },
+    {
+      "id": "showoff",
+      "he": "שואו-אוף",
+      "start": {
+        "buttons": 2,
+        "clicks": 2
+      },
+      "playlist": "showoff",
+      "inSong": "verses alternate starting LEFT (lime) then right (blue), choruses both (pink), final section always both. Intro/bridge/outro handling: TBD (see open)."
+    },
+    {
+      "id": "thunder",
+      "he": "סיבוב הרעם",
+      "start": {
+        "buttons": 2,
+        "clicks": 3
+      },
+      "playlist": "thunder",
+      "inSong": "see thunder block"
+    }
+  ],
+  "lifecycle": {
+    "idle": "every launch starts from idle",
+    "afterSong": "return to idle; the next game needs a fresh launch gesture; no auto-next",
+    "ending": "duet and showoff always end with both players together; every other ending is plain. No applause round, no score.",
+    "afterFail": "idle",
+    "afterStop": "idle (assumed, confirm)",
+    "afterSkip": "new song, same game (whether the intro replays: TBD)"
+  },
+  "launch": {
+    "rule": "Presses on opposite buttons whose FIRST presses are within syncWindowMs are 'together'. Decision time = max(soloWaitMs, syncWindowMs) after the last press. Together + equal counts 1..matchMaxCount => game by count. Together + different counts, or count > matchMaxCount => fail gesture. Not together => solo of the earlier button.",
+    "latePress": "a first press on the other button after syncWindowMs is not part of the launch: it neither joins nor restarts the wait; it is then an ordinary in-song press.",
+    "poleFeedback": "each click fills the presser's own pole to launchPcts (33 / 66 / 100 %)",
+    "success": "the matched game's 3-2-1 intro starts immediately (count 3 = poles at 100%). No extra flash before it: the intro is the 3 seconds.",
+    "fail": "poles blink alternately L,R,L,R (white, failBlinkCount x failBlinkMs), then the last lit pole fades to 0 over failFadeMs, then idle. Nothing starts. No red."
+  },
+  "intro": {
+    "steps": 3,
+    "polePcts": [
+      100,
+      66,
+      33,
+      0
+    ],
+    "perGame": {
+      "duet": "pink on both sides, animated gradient, brightness steps up each count",
+      "showoff": "3: left side in left colour. 2: right side in right colour. 1: both sweep inward and merge into pink (a happy joining). Poles keep player colours (L lime, R blue) until the merge.",
+      "thunder": "white only. 3: left side. 2: right side. 1: centre (catwalk + middle).",
+      "fail": "alternate pole blinks, no perimeter"
+    },
+    "binding": "pole percentages, timing and outcomes are binding; perimeter/wash drawing is illustration for the scene session",
+    "afterIntro": "song starts, pole at 0%, scene takes over"
+  },
+  "controls": {
+    "skip": {
+      "gesture": "double click, one button",
+      "until": "middle of verse 2 (all modes)",
+      "fallbackTunable": "skipFallbackMs"
+    },
+    "applause": {
+      "gesture": "5+ presses, one button",
+      "thunderException": "during countdown/window only the dark pole can applaud"
+    },
+    "stop": {
+      "gesture": "long press on both buttons together (within syncWindowMs of each other)",
+      "soloException": "one button is enough in solo"
+    }
+  },
+  "thunder": {
+    "activeAtVerseEnds": "2..N-1",
+    "noCountdownNoWindowAfter": [
+      1,
+      "last verse"
+    ],
+    "why": "first window is after verse 2, which is after the skip cutoff; a countdown only exists to lead into a window",
+    "poleChoice": "random per verse; the other pole is dark",
+    "phases": [
+      {
+        "id": "rest",
+        "pole": "dark/dim"
+      },
+      {
+        "id": "build",
+        "beats": "-countdownBeats..-rushBeats-1",
+        "pole": "+100/countdownBeats % per beat, stepwise (12.5% at 8 beats)"
+      },
+      {
+        "id": "rush",
+        "beats": "-rushBeats..-1",
+        "pole": "keeps climbing to 100%, pulses at double rate"
+      },
+      {
+        "id": "open",
+        "beats": "0",
+        "pole": "100% solid white"
+      },
+      {
+        "id": "window",
+        "beats": "0..W",
+        "pole": "drains 100/W % per beat"
+      },
+      {
+        "id": "tag",
+        "trigger": "press on active pole in [verseChange - graceMs, windowEnd]",
+        "fireAt": "first beat >= max(verseChange, press)",
+        "effect": "half-beat blackout, new look, smoke puff"
+      },
+      {
+        "id": "early",
+        "trigger": "press on active pole after countdown start and before verseChange - graceMs",
+        "effect": "pole falls to 0 in earlyFallMs; countdown and window cancelled; whoever is on stage gets an empowering halo for flareBars"
+      },
+      {
+        "id": "none",
+        "trigger": "no press",
+        "effect": "performer keeps the stage"
+      }
+    ],
+    "windowBeats": "windowBeatsShort if that lasts >= minWindowMs, else windowBeatsLong",
+    "defend": "early press by the performer or a friend is allowed on purpose (feature)",
+    "benched": [
+      "riser sound under the last 4 beats"
+    ],
+    "illustrationOnly": "perimeter chase rings, downbeat flicker and button blink in the demo are not decided"
+  },
+  "tunables": [
+    {
+      "id": "syncWindowMs",
+      "group": "הפעלה",
+      "value": 400,
+      "unit": "ms",
+      "he": "מרווח מקסימלי בין הלחיצות הראשונות בשני הכפתורים כדי להיחשב 'יחד'"
+    },
+    {
+      "id": "soloWaitMs",
+      "group": "הפעלה",
+      "value": 500,
+      "unit": "ms",
+      "he": "כמה מחכים אחרי הלחיצה האחרונה לפני שמחליטים (וסולו מתחיל). בפועל: הגדול מבין soloWaitMs ל-syncWindowMs"
+    },
+    {
+      "id": "matchMaxCount",
+      "group": "הפעלה",
+      "value": 3,
+      "unit": "clicks",
+      "he": "מקסימום לחיצות לכפתור. מעל זה, גם אם המספרים שווים, לא יצא"
+    },
+    {
+      "id": "launchPcts",
+      "group": "הפעלה",
+      "value": [
+        33,
+        66,
+        100
+      ],
+      "unit": "%",
+      "he": "מילוי העמוד בלחיצה 1, 2, 3"
+    },
+    {
+      "id": "failBlinkCount",
+      "group": "הפעלה",
+      "value": 4,
+      "unit": "blinks",
+      "he": "כמה הבהובים כשלא מסתנכרנים"
+    },
+    {
+      "id": "failBlinkMs",
+      "group": "הפעלה",
+      "value": 250,
+      "unit": "ms",
+      "he": "אורך כל הבהוב כשלא מסתנכרנים"
+    },
+    {
+      "id": "failFadeMs",
+      "group": "הפעלה",
+      "value": 500,
+      "unit": "ms",
+      "he": "דעיכת העמוד אחרי ההבהובים"
+    },
+    {
+      "id": "introStepMs",
+      "group": "אינטרו",
+      "value": 1000,
+      "unit": "ms",
+      "he": "אורך כל ספירה (3, 2, 1). שלוש ספירות = 3 שניות, והאינטרו עד 3 שניות, אז לא להעלות"
+    },
+    {
+      "id": "polePcts",
+      "group": "אינטרו",
+      "value": [
+        100,
+        66,
+        33,
+        0
+      ],
+      "unit": "%",
+      "he": "מילוי העמוד בספירות 3, 2, 1 ובתחילת השיר"
+    },
+    {
+      "id": "skipFallbackMs",
+      "group": "בשיר",
+      "value": 30000,
+      "unit": "ms",
+      "he": "עד מתי מותר דילוג בשיר בלי סימוני בתים"
+    },
+    {
+      "id": "applausePresses",
+      "group": "בשיר",
+      "value": 5,
+      "unit": "clicks",
+      "he": "כמה לחיצות מפעילות מחיאות כפיים"
+    },
+    {
+      "id": "doubleClickMs",
+      "group": "בשיר",
+      "value": 350,
+      "unit": "ms",
+      "he": "מרווח מקסימלי בין שתי הלחיצות של דילוג. הצעה: ערך קיים בקוד גובר"
+    },
+    {
+      "id": "longPressMs",
+      "group": "בשיר",
+      "value": 1500,
+      "unit": "ms",
+      "he": "כמה מחזיקים לעצירה. הצעה: ערך קיים בקוד גובר"
+    },
+    {
+      "id": "applauseWindowMs",
+      "group": "בשיר",
+      "value": 2000,
+      "unit": "ms",
+      "he": "חלון הספירה של לחיצות המחיאות. הצעה: ערך קיים בקוד גובר"
+    },
+    {
+      "id": "countdownBeats",
+      "group": "סיבוב הרעם",
+      "value": 8,
+      "unit": "beats",
+      "he": "אורך הספירה לפני שינוי הבית"
+    },
+    {
+      "id": "rushBeats",
+      "group": "סיבוב הרעם",
+      "value": 4,
+      "unit": "beats",
+      "he": "כמה ביטים מהספירה בדהירה (פעימות כפולות)"
+    },
+    {
+      "id": "windowBeatsShort",
+      "group": "סיבוב הרעם",
+      "value": 4,
+      "unit": "beats",
+      "he": "אורך החלון הרגיל"
+    },
+    {
+      "id": "windowBeatsLong",
+      "group": "סיבוב הרעם",
+      "value": 8,
+      "unit": "beats",
+      "he": "אורך החלון בשירים מהירים"
+    },
+    {
+      "id": "minWindowMs",
+      "group": "סיבוב הרעם",
+      "value": 2000,
+      "unit": "ms",
+      "he": "חלון קצר מזה? עוברים לארוך"
+    },
+    {
+      "id": "graceMs",
+      "group": "סיבוב הרעם",
+      "value": 150,
+      "unit": "ms",
+      "he": "עד כמה לפני שינוי הבית לחיצה עדיין נחשבת בזמן"
+    },
+    {
+      "id": "earlyFallMs",
+      "group": "סיבוב הרעם",
+      "value": 500,
+      "unit": "ms",
+      "he": "כמה זמן לוקח לאור ליפול בלחיצה מוקדמת"
+    },
+    {
+      "id": "flareBars",
+      "group": "סיבוב הרעם",
+      "value": 1,
+      "unit": "bars",
+      "he": "אורך ההילה למי שעל הבמה אחרי לחיצה מוקדמת"
+    },
+    {
+      "id": "fallbackCountdownMs",
+      "group": "סיבוב הרעם",
+      "value": 4000,
+      "unit": "ms",
+      "he": "ספירה בשיר בלי ביטים"
+    },
+    {
+      "id": "fallbackWindowMs",
+      "group": "סיבוב הרעם",
+      "value": 2500,
+      "unit": "ms",
+      "he": "חלון בשיר בלי ביטים"
+    },
+    {
+      "id": "fallbackTurnMs",
+      "group": "סיבוב הרעם",
+      "value": 20000,
+      "unit": "ms",
+      "he": "אורך תור בשיר בלי סימוני בתים (גם בשואו-אוף)"
+    },
+    {
+      "id": "driftPeriodMs",
+      "group": "צבע",
+      "value": 2800,
+      "unit": "ms",
+      "he": "זמן מחזור הנשימה בליים, כחול ולבן"
+    },
+    {
+      "id": "pinkDriftPeriodMs",
+      "group": "צבע",
+      "value": 2000,
+      "unit": "ms",
+      "he": "זמן מחזור הנשימה בוורוד. קצר מהשאר: השיא תמיד הכי חי"
+    },
+    {
+      "id": "limeGain",
+      "group": "צבע",
+      "value": 1.0,
+      "unit": "x",
+      "he": "עוצמת הליים. מורידים אם הוא חזק מהכחול"
+    },
+    {
+      "id": "blueGain",
+      "group": "צבע",
+      "value": 1.0,
+      "unit": "x",
+      "he": "עוצמת הכחול. מעלים אם הוא עמום"
+    },
+    {
+      "id": "pinkGain",
+      "group": "צבע",
+      "value": 1.0,
+      "unit": "x",
+      "he": "עוצמת הוורוד"
+    }
+  ],
+  "songs": {
+    "schema": {
+      "id": "string",
+      "title": "string",
+      "artist": "string",
+      "file": "path",
+      "playlists": [
+        "solo|duet|showoff|thunder"
+      ],
+      "bpm": "number (thunder)",
+      "beats": "seconds[] (thunder)",
+      "sections": [
+        {
+          "type": "intro|verse|chorus|bridge|outro",
+          "start": "seconds",
+          "end": "seconds"
+        }
+      ]
+    },
+    "example": {
+      "id": "example-001",
+      "title": "Example",
+      "artist": "Someone",
+      "file": "songs/example-001.mp3",
+      "playlists": [
+        "showoff",
+        "thunder"
+      ],
+      "bpm": 120,
+      "beats": [
+        0.5,
+        1.0,
+        1.5,
+        2.0
+      ],
+      "sections": [
+        {
+          "type": "intro",
+          "start": 0,
+          "end": 8
+        },
+        {
+          "type": "verse",
+          "start": 8,
+          "end": 24
+        },
+        {
+          "type": "chorus",
+          "start": 24,
+          "end": 40
+        }
+      ]
+    }
+  },
+  "copySlots": [
+    "launch.duet",
+    "launch.showoff",
+    "launch.thunder",
+    "launch.fail",
+    "showoff.turnLeft",
+    "showoff.turnRight",
+    "showoff.together",
+    "thunder.tag",
+    "thunder.early"
+  ],
+  "analytics": {
+    "logFormat": "append-only JSONL on the controller, one line per event: {t: ISO time, mono: ms since boot, type, ...fields}. Pull the file after the event. No network needed.",
+    "events": [
+      {
+        "type": "launch_attempt",
+        "fields": {
+          "countL": "int",
+          "countR": "int",
+          "gapMs": "int|null (between first presses)",
+          "result": "solo|duet|showoff|thunder|fail"
+        }
+      },
+      {
+        "type": "song_start",
+        "fields": {
+          "songId": "string",
+          "game": "solo|duet|showoff|thunder",
+          "bpm": "number|null",
+          "hasSections": "bool",
+          "hasBeats": "bool"
+        }
+      },
+      {
+        "type": "song_end",
+        "fields": {
+          "songId": "string",
+          "game": "string",
+          "playedMs": "int",
+          "reason": "finished|skip|stop",
+          "atMs": "int (time into the song when skip/stop happened)"
+        }
+      },
+      {
+        "type": "press",
+        "fields": {
+          "side": "L|R",
+          "kind": "skip|applause|stop|tag|early|dark|ordinary"
+        }
+      },
+      {
+        "type": "window",
+        "fields": {
+          "songId": "string",
+          "verse": "int",
+          "pole": "L|R",
+          "outcome": "tag|early|none",
+          "pressOffsetMs": "int|null (relative to verse change)",
+          "windowBeats": "int",
+          "bpm": "number"
+        }
+      },
+      {
+        "type": "tunable_change",
+        "fields": {
+          "id": "string",
+          "from": "any",
+          "to": "any"
+        }
+      },
+      {
+        "type": "fault",
+        "fields": {
+          "kind": "plug_failed|audio_missing|markers_missing|button_stuck",
+          "detail": "string"
+        }
+      },
+      {
+        "type": "night_note",
+        "fields": {
+          "text": "string (typed by the crew)"
+        }
+      }
+    ],
+    "notes": [
+      "Events only, anonymous; the file is pulled after the burn.",
+      "Every number answers a question. No question, no number."
+    ],
+    "notKnown": "מה אנחנו לא יודעים: אם מישהו ירד מהבמה באמצע שיר.",
+    "themes": [
+      {
+        "id": "understand",
+        "he": "הבנה",
+        "q": "מבינים איך מפעילים?",
+        "metrics": [
+          {
+            "he": "הצלחה בניסיון ראשון",
+            "f": "הפעלות שעבדו מיד ÷ כל ההפעלות בשני כפתורים",
+            "src": "launch_attempt"
+          },
+          {
+            "he": "ניסיונות עד הצלחה",
+            "f": "ממוצע ניסיונות עד שהפעלה עובדת",
+            "src": "launch_attempt"
+          },
+          {
+            "he": "טעויות נפוצות",
+            "f": "זוגות (שמאל, ימין) בכישלונות, למשל 2 מול 3",
+            "src": "launch_attempt.countL,countR"
+          },
+          {
+            "he": "נטישות",
+            "f": "כישלון, ואין הפעלה תוך 30 שניות",
+            "src": "launch_attempt"
+          }
+        ],
+        "chart": "heat",
+        "chartCap": "כמה פעמים כל זוג שמאל/ימין נכשל",
+        "learn": "לתקן את השלט או את חלון הסנכרון"
+      },
+      {
+        "id": "songs",
+        "he": "שירים",
+        "q": "אילו שירים אוהבים?",
+        "metrics": [
+          {
+            "he": "אחוז דילוג",
+            "f": "דילוגים ÷ ניגונים",
+            "src": "song_end.reason=skip, song_start"
+          },
+          {
+            "he": "מתי מדלגים",
+            "f": "השנייה בשיר שבה לחצו דילוג",
+            "src": "song_end.atMs"
+          },
+          {
+            "he": "מחיאות לשיר",
+            "f": "הפעלות של 5+ לחיצות בשיר",
+            "src": "press.kind=applause"
+          },
+          {
+            "he": "ניגונים לשיר",
+            "f": "כמה פעמים השיר התחיל",
+            "src": "song_start"
+          }
+        ],
+        "chart": "bars",
+        "chartCap": "שירים אהובים מול שירים שמדלגים",
+        "learn": "מדלגים מהר? מוציאים. הרבה מחיאות? מוסיפים דומים"
+      },
+      {
+        "id": "games",
+        "he": "משחקים",
+        "q": "מה משחקים?",
+        "metrics": [
+          {
+            "he": "הפעלות לכל משחק",
+            "f": "לפי שעה ולפי לילה",
+            "src": "launch_attempt.result"
+          },
+          {
+            "he": "נתח מההפעלות",
+            "f": "הפעלות של משחק ÷ כל ההפעלות",
+            "src": "launch_attempt.result"
+          },
+          {
+            "he": "עצירות מוקדמות",
+            "f": "עצירה לפני סוף השיר ÷ הפעלות",
+            "src": "song_end.reason=stop"
+          }
+        ],
+        "learn": "משקיעים במה שעובד"
+      },
+      {
+        "id": "thunder",
+        "he": "סיבוב הרעם",
+        "q": "זה עובד ברגע האמת?",
+        "metrics": [
+          {
+            "he": "החלפות",
+            "f": "חלונות עם החלפה ÷ חלונות שנפתחו",
+            "src": "window.outcome=tag"
+          },
+          {
+            "he": "לחיצות מוקדמות",
+            "f": "לחיצות מוקדמות ÷ חלונות שנפתחו",
+            "src": "window.outcome=early"
+          },
+          {
+            "he": "דיוק",
+            "f": "מילישניות מול החלפת הבית",
+            "src": "window.pressOffsetMs"
+          },
+          {
+            "he": "החלפות לשיר",
+            "f": "כמה החלפות בכל שיר",
+            "src": "window, song_start"
+          }
+        ],
+        "chart": "hist",
+        "chartCap": "דיוק הלחיצות סביב החלפת הבית",
+        "learn": "לכוונן את אורך החלון או את בהירות הספירה"
+      },
+      {
+        "id": "ops",
+        "he": "תפעול",
+        "q": "מתי עמוס, ומה נשבר?",
+        "metrics": [
+          {
+            "he": "הפעלות לשעה",
+            "f": "בכל לילה",
+            "src": "launch_attempt.t"
+          },
+          {
+            "he": "זמן סרק",
+            "f": "זמן בין סוף שיר להפעלה הבאה",
+            "src": "song_end, launch_attempt"
+          },
+          {
+            "he": "תקלות",
+            "f": "תקע לא ענה · קובץ שמע חסר · כפתור תקוע",
+            "src": "fault"
+          }
+        ],
+        "learn": "מתי להיות ליד הבמה ומה להחליף"
+      },
+      {
+        "id": "human",
+        "he": "אנושי",
+        "q": "מה המספרים לא יגידו?",
+        "metrics": [
+          {
+            "he": "הערת צוות",
+            "f": "שורה אחת בסוף כל לילה",
+            "src": "night_note"
+          },
+          {
+            "he": "מה אנחנו לא יודעים",
+            "f": "אם מישהו ירד מהבמה באמצע שיר",
+            "src": "-"
+          }
+        ],
+        "learn": "המספרים מראים מה. הצוות יודע למה"
+      }
+    ]
+  },
+  "open": [
+    "איך נגמר סיבוב הרעם: המופיע האחרון לבד (פשוט), או כולם ביחד?",
+    "הספירה היא 8 ביטים: 4 שניות ב-120 BPM (5.3 ב-90, 3.2 ב-150). בישיבה דיברו על כ-3 שניות. לקצר?",
+    "האם שני זרקורי ההצפה בצבע קבוע? זה מגביל את הליים והכחול.",
+    "שואו-אוף: של מי התור בפתיחה, בגשר ובסיום?",
+    "אחרי דילוג, האם הספירה 3-2-1 חוזרת?",
+    "אילו מכשירים קיימים בזוגות שמאל/ימין? אפשר לפצל את רצועת ההיקף לשני חצאים?",
+    "כיסוי לכפתור (שפה של 5 ס\"מ, שלוחצים רק מהכניסה): רעיון, לא הוחלט."
+  ],
+  "design": {
+    "figma": "https://www.figma.com/design/6tTdbG6vhXl5hLJjVVDu6a",
+    "direction": "Neon Marquee",
+    "tokens": {
+      "bg": "#000000",
+      "surface": "#120A10",
+      "line": "#3A2433",
+      "pink": "#FF1493",
+      "pinkGlow": "#FF6AC1",
+      "text": "#F6F2F5",
+      "muted": "#B4A8B0",
+      "lime": "#7DFF00",
+      "blue": "#1450FF",
+      "blueUi": "#7AA2FF"
+    },
+    "fonts": "Karantina (display), Heebo (text), embedded"
+  },
+  "chapters": [
+    "how",
+    "games",
+    "sign",
+    "measure",
+    "build"
+  ],
+  "todo": [
+    "עיצוב הסצנה: איזה מכשיר עושה מה, ברגע שלו (הסשן הבא)",
+    "סימוני מקטעים לכל שיר, וביטים לשירי סיבוב הרעם (ארבעה פלייליסטים)",
+    "חיבור כל ערכי הכוונון לממשק הקיים",
+    "משפטי קריין (משבצות copySlots)",
+    "לאשר: מנורת הכפתור דולקת/כבויה בלבד",
+    "רשימת מכשירים: זוגות שמאל/ימין, דימר",
+    "ניסוי שטח עם אנשים אמיתיים, לפני המדבר"
+  ]
+}

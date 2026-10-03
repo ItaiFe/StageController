@@ -1,0 +1,17 @@
+.show-tunables .tunable-group { margin-bottom: 1.25rem; }
+.show-tunables h3 { margin: 0 0 0.5rem; font-size: 0.95rem; color: var(--text-muted); }
+
+.tunable-row {
+  display: grid;
+  grid-template-columns: 1fr 9rem 3.5rem auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.tunable-row label { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.8rem; color: var(--text-muted); }
+.tunable-row label code { color: var(--text); font-size: 0.9rem; }
+.tunable-row input { width: 100%; box-sizing: border-box; }
+.tunable-unit { font-size: 0.8rem; color: var(--text-muted); }
+.tunable-error { color: var(--danger); font-size: 0.85rem; margin: 0 0 0.75rem; }

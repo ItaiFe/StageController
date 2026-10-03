@@ -37,7 +37,7 @@ class ButtonEvent(BaseModel):
 class ConnectionManager:
     def __init__(self):
         self.active_connections: list[WebSocket] = []
-        self.last_events: list[ButtonEvent] = []
+        self.last_events: list[BaseModel] = []
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
@@ -46,7 +46,7 @@ class ConnectionManager:
     def disconnect(self, websocket: WebSocket):
         self.active_connections.remove(websocket)
 
-    async def broadcast(self, event: ButtonEvent):
+    async def broadcast(self, event: BaseModel):
         self.last_events.append(event)
         if len(self.last_events) > 100:
             self.last_events = self.last_events[-100:]

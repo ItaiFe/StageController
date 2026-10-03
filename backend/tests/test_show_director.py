@@ -244,6 +244,23 @@ def test_song_vanishing_under_the_director_is_noticed():
     assert rig.director.state == "idle"
 
 
+
+def test_stop_while_the_start_sequence_runs_leaves_no_music_playing():
+    rig = Rig()
+    real_start = rig.player.start_game
+
+    async def start_then_stop(game):
+        song_id = await real_start(game)
+        await rig.director.on_press("stop", "L")  # long press during the main sequence's delays
+        rig.player.loaded = True  # ...which then loads the song anyway
+        return song_id
+
+    rig.player.start_game = start_then_stop
+    rig.press("start", "L")
+    rig.advance(500 + 3000 + STEP)
+    assert rig.director.state == "idle" and not rig.player.loaded
+    assert rig.legacy == [] and kinds(rig, "song_start") == []
+
 def test_empty_playlist_goes_back_to_idle():
     rig = Rig(song_id=None)
     rig.press("start", "L")
@@ -486,3 +503,10 @@ def test_a_song_changed_from_the_web_ui_reloads_the_song_map():
     assert [(f["songId"], f["reason"]) for f in kinds(rig, "song_end")] == [("1", "skip")]
     assert [f["songId"] for f in kinds(rig, "song_start")] == ["1", "2"]
     assert playing_events(rig)[-1].song.id == 2 and playing_events(rig)[-1].song.section is None
+
+
+def test_a_window_cut_short_by_stop_is_still_logged():
+    rig = play_thunder("R")
+    play_song(rig, 127.5)
+    rig.press("stop", "L")
+    assert [f["outcome"] for f in kinds(rig, "window")] == ["none"]

@@ -89,9 +89,6 @@ async def startup():
             # Turn off devices
             await end_show(db)
 
-            from app.features.show.service import director
-            await director.to_idle()
-
             # Broadcast state change
             from datetime import datetime
             event = ButtonEvent(action="stop", timestamp=datetime.now())

@@ -4,6 +4,7 @@ All time comes from the injected clock and the player behind a small adapter, so
 whole launches instantly without mpv or a database. The real adapter is StagePlayer.
 """
 import asyncio
+import math
 import random
 import time
 from dataclasses import dataclass
@@ -222,6 +223,10 @@ class ShowDirector:
         game = self.game
         self.state = "playing"
         song_id = await self._player.start_game(game)
+        if self.state != "playing":  # stopped while the start sequence ran: don't leave music playing untracked
+            if song_id is not None:
+                await self._player.run_action("stop")
+            return
         if song_id is None:
             print(f"Show: no song to play for game {game!r} (missing or empty playlist)")
             await self.to_idle()
@@ -271,6 +276,9 @@ class ShowDirector:
             await self.to_idle()
 
     def _end_song(self, reason: str) -> None:
+        if self._thunder and self._song_id is not None:  # a window cut short by stop/skip still logs
+            for w in self._thunder.to_log(math.inf):
+                self._log("window", **w.record(self._song_id, self._map.bpm))
         self._thunder = None
         if self._song_id is None:
             return

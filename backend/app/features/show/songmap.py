@@ -29,7 +29,7 @@ class SongMap:
             data = json.loads(Path(path).read_text())
             tempo = data.get("tempo") or {}
             return cls(tempo.get("bpm"), tempo.get("beats") or [], data.get("sections") or [])
-        except (OSError, ValueError, AttributeError):
+        except (OSError, ValueError, AttributeError, KeyError, TypeError):
             return cls(None, [], [])
 
     @property

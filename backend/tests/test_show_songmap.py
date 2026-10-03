@@ -113,3 +113,10 @@ def test_songmap_endpoint_gives_sections_with_turn_colours_and_the_cutoff(tmp_pa
     empty = client.get("/api/show/songmap/2").json()
     assert empty["sections"] == [] and not empty["has_markers"]
     assert client.get("/api/show/songmap/9").status_code == 404
+
+
+def test_a_sidecar_with_malformed_sections_is_the_same_as_none(tmp_path):
+    bad = tmp_path / "bad.analysis.json"
+    for sections in ([{"start": 0, "end": 5}], ["verse"]):
+        bad.write_text(json.dumps({"sections": sections}))
+        assert not SongMap.load(bad).has_markers

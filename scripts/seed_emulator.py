@@ -6,6 +6,9 @@
 Copies the audio to data/music/<stem>.m4a and the analysis next to it as <stem>.analysis.json,
 registers the song, puts it in the solo/duet/showoff/thunder playlists, and adds the stage
 appliances as devices (fake addresses, for STAGE_IO=emulated). Safe to run again.
+
+Laptop only: deploy.sh rsyncs data/ (db.sqlite included) to the Pi, and the fake devices
+would make every real start/stop wait out the plug timeout. Don't deploy a seeded data/.
 """
 import argparse
 import shutil

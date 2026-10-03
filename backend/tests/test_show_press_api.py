@@ -47,13 +47,15 @@ def test_press_without_side_takes_the_legacy_path(client, monkeypatch):
 def test_press_with_side_goes_to_the_director(client, monkeypatch):
     seen = []
 
-    async def on_press(action, side, ago):
-        seen.append((action, side, ago))
+    async def on_press(action, side, ago, taps):
+        seen.append((action, side, ago, taps))
         return {"status": "ok"}
 
     monkeypatch.setattr(service.director, "on_press", on_press)
     res = client.post("/api/buttons/press", json={"action": "start", "side": "R", "first_press_ago_ms": 120})
-    assert res.json() == {"status": "ok"} and seen == [("start", "R", 120)]
+    assert res.json() == {"status": "ok"} and seen == [("start", "R", 120, None)]
+    client.post("/api/buttons/press", json={"action": "special", "side": "L", "taps": 5})
+    assert seen[-1] == ("special", "L", 0, 5)
 
 
 def test_bad_side_or_negative_age_is_rejected(client):
@@ -69,3 +71,14 @@ def test_spec_endpoint_serves_the_stage_spec():
     spec = TestClient(app).get("/api/show/spec").json()
     assert spec["palette"]["pink"]["ramp"][1] == [255, 20, 147]
     assert [g["id"] for g in spec["games"]] == ["solo", "duet", "showoff", "thunder"]
+
+
+def test_a_client_joining_mid_show_gets_the_current_show_event(client, monkeypatch):
+    import asyncio
+    from app.features.show import events
+    manager = buttons.ConnectionManager()
+    monkeypatch.setattr(buttons, "manager", manager)
+    asyncio.run(manager.broadcast(events.playing("thunder", 3)))
+    with client.websocket_connect("/api/buttons/ws") as ws:
+        got = ws.receive_json()
+    assert (got["action"], got["state"], got["game"]) == ("show", "playing", "thunder")

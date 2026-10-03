@@ -108,6 +108,7 @@ def test_songmap_endpoint_gives_sections_with_turn_colours_and_the_cutoff(tmp_pa
     body = client.get("/api/show/songmap/1").json()
     verses = [(s["start"], s["turn"], s["color"]) for s in body["sections"] if s["label"] == "verse"]
     assert verses == [(66.04, "L", "lime"), (104.77, "R", "blue"), (194.49, "L", "lime")]
+    assert set(body["sections"][0]) == {"start", "end", "label", "index", "turn", "color"}
     assert body["sections"][-1]["turn"] == "both" and body["skip_cutoff_s"] == pytest.approx(115.72)
     empty = client.get("/api/show/songmap/2").json()
     assert empty["sections"] == [] and not empty["has_markers"]

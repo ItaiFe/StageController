@@ -22,16 +22,25 @@ describe('stageFrame', () => {
     expect(f.poles.L?.pct).toBe(100);
   });
 
-  it('solo intro lights only the presser side', () => {
-    const f = frame(ev({ state: 'intro', game: 'solo', step: 3, perimeter: { look: 'solid', color: 'pink', side: 'R' } } as Partial<ShowEvent>));
+  it('solo intro is symmetric: both poles and both halves of the edge, pink', () => {
+    const p: Pole = { pct: 100, color: 'pink', mode: 'solid', ms: null };
+    const f = frame(ev({ state: 'intro', game: 'solo', step: 3, poles: { L: p, R: p }, perimeter: { look: 'intro', color: 'pink', side: 'both' } } as Partial<ShowEvent>));
     const lit = litLeds(f);
-    expect(lit.length).toBeGreaterThan(0);
-    expect(lit.every(([x]) => x >= 360)).toBe(true);
+    expect(lit.some(([x]) => x < 360) && lit.some(([x]) => x > 360)).toBe(true);
+    expect([f.poles.L?.pct, f.poles.R?.pct]).toEqual([100, 100]);
   });
 
   it('showoff intro step 1 merges into pink in the centre', () => {
     const f = frame(ev({ state: 'intro', game: 'showoff', step: 1 } as Partial<ShowEvent>), 0.99);
     expect(f.wash.C?.name).toBe('pink');
+  });
+
+  it('in song the poles glow full height at the event level, the button lit; the side not singing is off', () => {
+    const glow: Pole = { pct: 100, color: 'lime', mode: 'glow', ms: null, level: 35 };
+    const f = frame(ev({ state: 'playing', game: 'duet', poles: { L: glow, R: off } } as Partial<ShowEvent>));
+    expect(f.poles.L).toMatchObject({ pct: 100, name: 'lime', a: 0.35 });
+    expect(f.poles.R).toBeNull();
+    expect(f.buttons).toEqual({ L: true, R: false });
   });
 
   it('thunder tag is a full blackout', () => {

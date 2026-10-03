@@ -2,8 +2,8 @@
 // show events. Pole fill comes from the events (binding); the perimeter, washes and the smoke puff
 // follow the spec's drawings (illustration, spec intro.binding).
 
-import { poleState } from './events';
-import type { Rgb, ShowEvent, ShowSpec } from './events';
+import { buttonRings, poleState } from './events';
+import type { ButtonLights, Rgb, Ring, ShowEvent, ShowSpec } from './events';
 
 export type Side = 'L' | 'R';
 export type Wash = 'L' | 'R' | 'C';
@@ -39,6 +39,7 @@ export interface StageFrame {
   wash: Partial<Record<Wash, Lit>>;
   poles: Record<Side, (Lit & { pct: number }) | null>;
   buttons: Record<Side, boolean>;
+  rings?: { L: Ring; R: Ring }; // in song: the button rings in the singer's colour
   puff: { r: number; a: number } | null;
   strips?: Partial<Record<Side, Rgb[]>>; // a pole showing the pillar's own slot sequence, bottom first
 }
@@ -49,6 +50,7 @@ export interface StageInput {
   nowS: number; // free-running clock for the colour drift
   beatS: number; // one beat of the song playing
   look: number; // thunder: tags so far (picks the perimeter colour)
+  handover?: { buttons: ButtonLights; sinceS: number } | null; // the last change of singer
 }
 
 const clamp = (x: number, a = 0, b = 1) => Math.min(b, Math.max(a, x));
@@ -74,7 +76,7 @@ export function drift(spec: ShowSpec, name: string, i: number, t: number): Rgb {
 const half = (side: string | null | undefined) => (p: [number, number]) =>
   side === 'L' ? p[0] < MID : side === 'R' ? p[0] >= MID : side === 'centre' ? Math.abs(p[0] - MID) <= 115 : true;
 
-export function stageFrame(spec: ShowSpec, { event, sinceEventS, nowS: t, beatS, look }: StageInput): StageFrame {
+export function stageFrame(spec: ShowSpec, { event, sinceEventS, nowS: t, beatS, look, handover }: StageInput): StageFrame {
   const f: StageFrame = { leds: LEDS.map(() => null), wash: {}, poles: { L: null, R: null }, buttons: { L: false, R: false }, puff: null };
   const paint = (name: string, a: number, pick: (p: [number, number]) => boolean = () => true) =>
     LEDS.forEach((p, i) => { if (pick(p)) f.leds[i] = { c: drift(spec, name, i, t), a: clamp(a) }; });
@@ -103,6 +105,7 @@ export function stageFrame(spec: ShowSpec, { event, sinceEventS, nowS: t, beatS,
     return f;
   }
   if (event.state === 'intro') return intro(spec, event, sinceEventS, t, f, paint, poles);
+  if (!event.thunder) f.rings = buttonRings(event.buttons, handover); // a thunder frame drives the active button itself
   return playing(spec, event, sinceEventS, t, beatS, look, f, paint, poles);
 }
 
@@ -131,7 +134,7 @@ function intro(spec: ShowSpec, e: ShowEvent, since: number, t: number, f: StageF
     const where: Wash = side === 'L' ? 'L' : side === 'R' ? 'R' : 'C';
     f.wash[where] = { name, a: (e.game === 'thunder' ? 0.12 : 0.2) * hit };
   } else {
-    // duet (both sides) and solo (the presser's side): pink, brighter with each count
+    // duet and solo (both sides; solo is symmetric): pink, brighter with each count
     const a = [0.4, 0.65, 0.95][step] * (0.7 + 0.3 * hit);
     paint('pink', a, half(side));
     if (side !== 'R') f.wash.L = { name: 'pink', a: 0.1 * a };
@@ -144,6 +147,8 @@ function intro(spec: ShowSpec, e: ShowEvent, since: number, t: number, f: StageF
 
 function playing(spec: ShowSpec, e: ShowEvent, since: number, t: number, beatS: number, look: number,
   f: StageFrame, paint: Paint, poles: (b?: number) => void) {
+  poles(); // the in-song glow (or thunder's fill): each side in its song-map colour for the game
+  f.buttons = { L: !!f.poles.L, R: !!f.poles.R };
   const th = e.thunder;
   if (e.game === 'showoff' && e.turn && e.turn !== 'both') {
     // a verse: the singer's side in their colour

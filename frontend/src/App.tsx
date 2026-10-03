@@ -36,7 +36,7 @@ export default function App() {
 
   const player = useBackendPlayer();
 
-  useKeyboardShortcuts({
+  useKeyboardShortcuts(view === 'emulator' ? {} : { // the emulator uses the arrow keys as pillars
     onTogglePlay: player.toggle,
     onNext: player.next,
     onPrev: player.prev,
@@ -346,7 +346,7 @@ export default function App() {
         {view === 'emulator' && <StageEmulator />}
       </main>
 
-      {player.currentSong && (
+      {player.currentSong && view !== 'emulator' && ( // the emulator's song strip replaces the player bar
         <Player
           song={player.currentSong}
           playlistName={player.playlistName}

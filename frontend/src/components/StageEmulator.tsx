@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { buttonsApi, devicesApi, pillarApi, playerApi, showApi } from '../api';
-import type { Device, PlayerState } from '../api';
+import type { Device, PlayerState, ShowLogLine } from '../api';
 import { GestureDetector, gestureAction, LONG_PRESS_MS } from '../buttonGesture';
 import type { Gesture } from '../buttonGesture';
 import { useShowEvents } from '../hooks/useShowEvents';
@@ -9,6 +9,8 @@ import { blankStrip } from '../pillar/types';
 import type { Sequence, Slot, Strip } from '../pillar/types';
 import { paletteRgb, polePixels, slotWithoutShow } from '../show/events';
 import type { ShowSpec } from '../show/events';
+import { pct, seekTargets, segments } from '../show/timeline';
+import type { SongMapInfo } from '../show/timeline';
 import { StripCanvas } from './pillar/StripCanvas';
 import './StageEmulator.css';
 
@@ -18,9 +20,55 @@ const KEYS: Record<string, Side> = { a: 'L', l: 'R' };
 const SLOT_SEED = 1;
 const DEVICE_POLL_MS = 1500;
 const PLAYER_POLL_MS = 500;
+const LOG_POLL_MS = 2000;
+const SEEK_LEAD_S = 5;
 
 function describeGesture(g: Gesture): string {
   return g.kind === 'long' ? 'long press' : `${g.count} tap${g.count === 1 ? '' : 's'}`;
+}
+
+function describeLogLine({ type, t: _t, mono: _mono, ...fields }: ShowLogLine): string {
+  const rest = Object.entries(fields).map(([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`);
+  return [type, ...rest].join(' ');
+}
+
+/** Sections coloured by whose turn they are (the colours the real show would use), the skip cutoff, the playhead. */
+function Timeline({ map, spec, time, duration }: { map: SongMapInfo; spec: ShowSpec | null; time: number; duration: number }) {
+  const colour = (name: string) => {
+    const rgb = spec ? paletteRgb(spec, name) : null;
+    return rgb ? `rgb(${rgb.join(',')})` : undefined;
+  };
+  const cutoff = pct(map.skip_cutoff_s, duration);
+  return (
+    <section className="emulator-card emulator-timeline">
+      <h3>Song map{map.bpm ? ` · ${map.bpm} bpm` : ''}{map.has_markers ? '' : ' · no markers (spec fallbacks)'}</h3>
+      <div
+        className="timeline-bar"
+        onClick={e => {
+          const box = e.currentTarget.getBoundingClientRect();
+          playerApi.seek(((e.clientX - box.left) / box.width) * duration);
+        }}
+      >
+        {segments(map, duration).map(s => (
+          <div
+            key={s.start}
+            className="timeline-section"
+            style={{ left: `${s.left}%`, width: `${s.width}%`, background: colour(s.color) }}
+            title={`${s.label} ${s.index ?? ''} · ${s.start.toFixed(1)}–${s.end.toFixed(1)} s · ${s.turn}`}
+          >
+            {s.turn === 'both' ? '' : s.turn}
+          </div>
+        ))}
+        <div className="timeline-cutoff" style={{ left: `${cutoff}%` }} title={`Skip cutoff ${map.skip_cutoff_s.toFixed(2)} s`} />
+        <div className="timeline-playhead" style={{ left: `${pct(time, duration)}%` }} />
+      </div>
+      <div className="emulator-macros">
+        {seekTargets(map, time, SEEK_LEAD_S).map(t => (
+          <button key={t.label} type="button" onClick={() => playerApi.seek(t.to)}>{t.label} −{SEEK_LEAD_S} s</button>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 export function StageEmulator() {
@@ -35,6 +83,8 @@ export function StageEmulator() {
     R: { pending: 0, hold: 0, pressed: false },
   });
   const [lastPress, setLastPress] = useState('');
+  const [songMap, setSongMap] = useState<{ songId: number; map: SongMapInfo } | null>(null);
+  const [nightLog, setNightLog] = useState<ShowLogLine[]>([]);
 
   const detectors = useRef<Record<Side, GestureDetector>>({ L: new GestureDetector(), R: new GestureDetector() });
   const pressedRef = useRef<Record<Side, boolean>>({ L: false, R: false });
@@ -66,6 +116,19 @@ export function StageEmulator() {
     pollDevices();
     const timers = [window.setInterval(pollPlayer, PLAYER_POLL_MS), window.setInterval(pollDevices, DEVICE_POLL_MS)];
     return () => timers.forEach(window.clearInterval);
+  }, []);
+
+  const songId = player?.current_song?.id ?? null;
+  useEffect(() => {
+    if (songId === null) return;
+    showApi.getSongMap(songId).then(map => setSongMap({ songId, map })).catch(() => setSongMap(null));
+  }, [songId]);
+
+  useEffect(() => {
+    const poll = () => showApi.getLog().then(setNightLog).catch(() => {});
+    poll();
+    const timer = window.setInterval(poll, LOG_POLL_MS);
+    return () => window.clearInterval(timer);
   }, []);
 
   const send = useCallback(async (side: Side, label: string, action: ReturnType<typeof gestureAction>, agoMs: number) => {
@@ -200,6 +263,10 @@ export function StageEmulator() {
         {pillar('R')}
       </div>
 
+      {songId !== null && songMap?.songId === songId && player && (
+        <Timeline map={songMap.map} spec={spec} time={player.current_time} duration={player.duration} />
+      )}
+
       <div className="emulator-grid">
         <section className="emulator-card">
           <h3>Launch</h3>
@@ -232,6 +299,15 @@ export function StageEmulator() {
               ))}
             </div>
           )}
+        </section>
+
+        <section className="emulator-card">
+          <h3>Night log</h3>
+          <ul className="emulator-log">
+            {nightLog.slice().reverse().map(l => (
+              <li key={`${l.mono}-${l.type}-${l.t}`}><span>{l.t.slice(11, 19)}</span>{describeLogLine(l)}</li>
+            ))}
+          </ul>
         </section>
 
         <section className="emulator-card">

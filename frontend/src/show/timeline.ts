@@ -32,3 +32,11 @@ export function seekTargets(map: SongMapInfo, now: number, leadS: number) {
   if (verse2) targets.push({ label: 'Verse 2 end', to: verse2.end - leadS });
   return targets.map(t => ({ ...t, to: Math.max(0, t.to) }));
 }
+
+/** 10 s before the next verse change that has a thunder window (end of verses 2..N-1); the first one again past the last. */
+export function thunderSeek(map: SongMapInfo, now: number, leadS = 10) {
+  const verses = map.sections.filter(s => s.label === 'verse');
+  const windows = verses.slice(1, -1).map((v, i) => ({ verse: i + 2, end: v.end }));
+  const next = windows.find(w => w.end - leadS > now) ?? windows[0];
+  return next ? { label: `Thunder window (verse ${next.verse})`, to: Math.max(0, next.end - leadS) } : null;
+}

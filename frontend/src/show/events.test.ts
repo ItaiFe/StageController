@@ -40,6 +40,12 @@ describe('polePixels', () => {
     expect(lit(polePixels(pole({ mode: 'blink' }), pink, 300))).toBe(0);
     expect(lit(polePixels(pole({ mode: 'pulse' }), pink, 123))).toBe(50);
   });
+
+  it('pulses at the period the event gives', () => {
+    const red = (ms: number | null, at: number) => polePixels(pole({ mode: 'pulse', ms }), pink, at)[0];
+    expect(red(290, 290 / 4)).toBe(255); // the top of the pulse a quarter period in
+    expect(red(null, 290 / 4)).not.toBe(255);
+  });
 });
 
 describe('slotWithoutShow', () => {
@@ -59,5 +65,7 @@ describe('describeEvent', () => {
     expect(describeEvent({ action: 'claps' })).toBe('button claps');
     const playing = { action: 'show', state: 'playing', game: 'showoff', step: null, poles: e.poles, turn: 'R', song: { id: 1, section: 'verse', section_index: 2, t: 105 } };
     expect(describeEvent(playing)).toBe('playing · showoff · verse 2 · turn R · L 100% R 100%');
+    const thunder = { ...playing, game: 'thunder', turn: null, thunder: { phase: 'rush', pole: 'L', beat: -3 } };
+    expect(describeEvent(thunder)).toBe('playing · thunder · verse 2 · thunder rush L beat -3 · L 100% R 100%');
   });
 });

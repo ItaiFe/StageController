@@ -31,7 +31,7 @@ export interface ShowSpec {
   games: { id: string; start: { buttons: number; clicks: number } }[];
 }
 
-// How the emulator draws pulse and blink; the spec leaves their rate to the LED side
+// How the emulator draws pulse and blink when the event gives no rate (thunder's rush does: `ms`)
 const PULSE_MS = 500;
 const BLINK_MS = 250;
 
@@ -52,7 +52,7 @@ export function polePixels(pole: Pole, rgb: Rgb | null, elapsedMs: number): Stri
   let level = 1;
   if (pole.mode === 'drain' && pole.ms) pct *= Math.max(0, 1 - elapsedMs / pole.ms);
   if (pole.mode === 'blink') level = Math.floor(elapsedMs / BLINK_MS) % 2 === 0 ? 1 : 0;
-  if (pole.mode === 'pulse') level = 0.65 + 0.35 * Math.sin((elapsedMs / PULSE_MS) * 2 * Math.PI);
+  if (pole.mode === 'pulse') level = 0.65 + 0.35 * Math.sin((elapsedMs / (pole.ms || PULSE_MS)) * 2 * Math.PI);
 
   const lit = Math.round((pct / 100) * PIXEL_COUNT);
   for (let i = 0; i < lit; i++) {
@@ -79,6 +79,7 @@ export function describeEvent(data: { action: string; [key: string]: unknown }):
   if (e.step !== null) parts.push(`step ${e.step}`);
   if (e.song?.section) parts.push(`${e.song.section} ${e.song.section_index ?? ''}`.trim());
   if (e.turn) parts.push(`turn ${e.turn}`);
+  if (e.thunder) parts.push(`thunder ${e.thunder.phase} ${e.thunder.pole} beat ${e.thunder.beat}`);
   if (e.state !== 'idle') parts.push(`L ${e.poles.L.pct}% R ${e.poles.R.pct}%`);
   return parts.join(' · ');
 }

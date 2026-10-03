@@ -215,3 +215,29 @@
   background: #fff;
   pointer-events: none;
 }
+
+.pole-role {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.pole-role.active { color: #fff; font-weight: 600; }
+
+.thunder-status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.beat-flash {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  animation: beat-flash 0.3s ease-out forwards;
+}
+
+@keyframes beat-flash {
+  to { opacity: 0.15; }
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pct, seekTargets, segments } from './timeline';
+import { pct, seekTargets, segments, thunderSeek } from './timeline';
 import type { SongMapInfo } from './timeline';
 
 const sec = (start: number, end: number, label: string) => ({ start, end, label, turn: 'both' as const, color: 'pink' });
@@ -34,5 +34,19 @@ describe('seekTargets', () => {
   it('has no next section at the end and never seeks before 0', () => {
     const t = seekTargets({ ...map, sections: [sec(0, 3, 'verse')], skip_cutoff_s: 2 }, 100, 5);
     expect(t).toEqual([{ label: 'Skip cutoff', to: 0 }]);
+  });
+});
+
+describe('thunderSeek', () => {
+  const verses = { ...map, sections: [sec(0, 10, 'verse'), sec(10, 20, 'verse'), sec(20, 30, 'chorus'), sec(30, 40, 'verse'), sec(40, 50, 'verse')] };
+
+  it('goes 10 s before the next verse change that has a thunder window (verses 2..N-1)', () => {
+    expect(thunderSeek(verses, 0)).toEqual({ label: 'Thunder window (verse 2)', to: 10 });
+    expect(thunderSeek(verses, 15)).toEqual({ label: 'Thunder window (verse 3)', to: 30 });
+  });
+
+  it('wraps to the first window after the last one and is null without one', () => {
+    expect(thunderSeek(verses, 45)).toEqual({ label: 'Thunder window (verse 2)', to: 10 });
+    expect(thunderSeek(map, 0)).toBeNull(); // two verses: no window
   });
 });

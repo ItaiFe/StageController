@@ -44,8 +44,8 @@ IDLE --gesture(side)--> LAUNCHING --decide--> INTRO(game, 3 steps x introStepMs)
   Since a pillar reports a whole gesture at once, each gesture event fills that side's pole to
   `launchPcts[count-1]` (capped at 100) immediately on arrival.
 - **INTRO**: steps 3,2,1 at `introStepMs` with poles at `polePcts` [100,66,33] then 0 at song
-  start; per-game colours from spec `intro.perGame` (solo: pink single side = presser; duet:
-  pink both; showoff: L lime, R blue, merge to pink on 1; thunder: white L, R, centre).
+  start; per-game colours from spec `intro.perGame` (solo and duet: pink both — solo is
+  symmetric, see Deviations; showoff: L lime, R blue, merge to pink on 1; thunder: white L, R, centre).
   The song starts when the intro ends.
 - **PLAYING**: plays a random song from the game's playlist (reuse the existing shuffle/queue
   code; keep running the `main` device sequence at song start as today). Song end → existing
@@ -58,8 +58,10 @@ IDLE --gesture(side)--> LAUNCHING --decide--> INTRO(game, 3 steps x introStepMs)
 - **Showoff turns**: verse k (1-based) belongs to L if k odd else R; choruses and every
   non-verse section → both; the **last** section → both. Without sidecar: alternate L/R every
   `fallbackTurnMs`, both for the final `fallbackTurnMs`.
-- **Thunder** (spec `thunder`): for each verse k in 2..N−1, `verseChange` = end of verse k.
-  Random pole (injected RNG); the other is dark. Beats from the sidecar (`fallbackCountdownMs`/
+- **Thunder** (spec `thunder`): windows at the section change that ends verse 2, then at
+  every `thunder.everySections`-th (2) section change after it, never at the change into the
+  final section; a window whose countdown would start before the previous window ends is
+  dropped. `verseChange` below = that section change. Random pole (injected RNG); the other is dark. Beats from the sidecar (`fallbackCountdownMs`/
   `fallbackWindowMs` without beats). Phases relative to the beat index b0 nearest
   `verseChange`: build `[-countdownBeats, -rushBeats-1]` (+100/countdownBeats % per beat),
   rush `[-rushBeats, -1]` (keeps climbing, pulses double rate), open at 0 (100 % white),
@@ -69,7 +71,8 @@ IDLE --gesture(side)--> LAUNCHING --decide--> INTRO(game, 3 steps x introStepMs)
   max(verseChange, press time, arrival time): half-beat blackout + new look + smoke; after
   countdown start and before `verseChange − graceMs` → **early**: pole falls to 0 over
   `earlyFallMs`, window cancelled, halo for `flareBars` (4 beats per bar); no press → none.
-  Each window logs `window{verse,pole,outcome,pressOffsetMs,windowBeats,bpm}`.
+  Each window logs `window{section,pole,outcome,pressOffsetMs,windowBeats,bpm}` (`section` =
+  the 1-based index of the section that ends).
 
 ## Show events (WS)
 
@@ -86,7 +89,8 @@ client that joins late is correct after one message:
  "thunder": {"phase": "rush", "pole": "L", "beat": -3}}
 ```
 
-`mode`: `solid | pulse | blink | drain | off`. Colours are palette names (`pink|lime|blue|white`)
+`mode`: `glow | solid | pulse | blink | drain | off` (`glow` carries `level`). Claps also send a
+one-shot `{"action":"cue","cue":"claps",...}`. Colours are palette names (`pink|lime|blue|white`)
 resolved through `spec.json` palette ramps. Full list in `docs/show-events-contract.md`.
 
 ## Emulator
@@ -105,6 +109,26 @@ resolved through `spec.json` palette ramps. Full list in `docs/show-events-contr
   `frontend/src/pillar/` port (idle rainbow, start comet), exactly as the real pillar would.
 - `scripts/seed_emulator.py`: copies the example song + analysis into `data/music/`, registers
   the song, creates the four game playlists with it.
+
+## Deviations from the spec (asked for by the user, 2026-10-03)
+
+- **Solo is symmetric** (overrides the spec's "solo: pink on the presser's side"): an L×1 and an
+  R×1 launch give identical intro and song events — both poles step 100 → 66 → 33 pink, the
+  perimeter is `both`, in-song both poles glow pink. Only the launch fill (33/66/100 % on the
+  presser's own pole, button feedback) and the logged side differ.
+- **In-song pole glow** (overrides "poles 0 % after the intro"): full height at `ambientGlowPct`
+  (35 %) as `mode: "glow"`, so binding fills stay distinct; colour by section owner — duet the
+  singer, showoff the turn, thunder the singer until a tag then the tagger; the side not owning
+  the section is off.
+- **Duet singer**: the sidecars have no singer field, so a section may carry an optional
+  hand-tagged `turn` (`L`/`R`/`both`); untagged songs fall back to the showoff alternation; the
+  final section is always both.
+- **Handover cue** (not in the spec, added by Tom): the button rings take the singer's colour
+  (lime / blue / pink, dim when not singing); at each change of singer both buttons pulse together
+  (`handoverPulses` 3 over `handoverPulseMs` 1000, ease in/out), then settle. In the show event
+  (`buttons`), so the real pillar LEDs do it too.
+- **Thunder cadence**: windows every `everySections` section changes from the end of verse 2
+  (was: the end of every verse 2..N−1).
 
 ## Out of scope
 

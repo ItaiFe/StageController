@@ -76,3 +76,39 @@ def test_a_sidecar_without_sections_or_with_bad_json_is_the_same_as_none(tmp_pat
 def test_one_verse_only_uses_the_fallback_cutoff(tmp_path):
     song = SongMap(None, [], [{"start": 0, "end": 10, "label": "verse"}])
     assert song.skip_cutoff_s() == tunables.get("skipFallbackMs") / 1000
+
+
+def test_songmap_endpoint_gives_sections_with_turn_colours_and_the_cutoff(tmp_path):
+    import shutil
+
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import StaticPool
+
+    from app.core.database import Base, get_db
+    from app.features.show.router import router
+    from app.features.songs.models import Song
+
+    shutil.copy(FIXTURE, tmp_path / "x.analysis.json")
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    db = sessionmaker(bind=engine)()
+    def song(i, name):
+        return Song(id=i, title="x", duration=1.0, filename=name, file_path=str(tmp_path / name), file_size=1, format="m4a")
+
+    db.add_all([song(1, "x.m4a"), song(2, "none.m4a")])
+    db.commit()
+    app = FastAPI()
+    app.include_router(router, prefix="/api")
+    app.dependency_overrides[get_db] = lambda: db
+    client = TestClient(app)
+
+    body = client.get("/api/show/songmap/1").json()
+    verses = [(s["start"], s["turn"], s["color"]) for s in body["sections"] if s["label"] == "verse"]
+    assert verses == [(66.04, "L", "lime"), (104.77, "R", "blue"), (194.49, "L", "lime")]
+    assert body["sections"][-1]["turn"] == "both" and body["skip_cutoff_s"] == pytest.approx(115.72)
+    empty = client.get("/api/show/songmap/2").json()
+    assert empty["sections"] == [] and not empty["has_markers"]
+    assert client.get("/api/show/songmap/9").status_code == 404

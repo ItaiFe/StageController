@@ -7,7 +7,6 @@ import asyncio
 import time
 from dataclasses import dataclass
 from functools import partial
-from pathlib import Path
 
 from app.features.buttons.rules import IDLE_TAPS, IN_SONG
 
@@ -69,11 +68,9 @@ class StagePlayer:
         db = SessionLocal()
         try:
             song = db.get(Song, player.get_current_song_id())
-            path = Path(song.file_path) if song else Path()
+            return SongMap.for_audio(song.file_path, MUSIC_DIR) if song else SongMap(None, [], [])
         finally:
             db.close()
-        # the sidecar sits next to the audio: <stem>.analysis.json
-        return SongMap.load((path if path.is_absolute() else MUSIC_DIR / path).with_suffix(".analysis.json"))
 
     async def run_action(self, action: str) -> None:
         from app.core.database import SessionLocal

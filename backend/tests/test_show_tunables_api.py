@@ -77,3 +77,9 @@ def test_a_saved_override_for_a_tunable_the_spec_no_longer_has_is_ignored(api):
     db.commit()
     load_tunables(db)
     assert "gone" not in tunables._overrides
+
+
+def test_mandatory_tunables_are_flagged(api):
+    client, _ = api
+    flagged = [r["id"] for r in client.get("/api/show/tunables").json() if r["mandatory"]]
+    assert flagged == tunables.SPEC["tunablesUi"]["mandatory"]

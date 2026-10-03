@@ -18,6 +18,12 @@ class SongMap:
         self._verses = [s for s in sections if s["label"] == "verse"]
 
     @classmethod
+    def for_audio(cls, file_path: str, music_dir: Path) -> "SongMap":
+        """The sidecar sits next to the audio: <stem>.analysis.json (file_path may be relative to music_dir)."""
+        path = Path(file_path)
+        return cls.load((path if path.is_absolute() else music_dir / path).with_suffix(".analysis.json"))
+
+    @classmethod
     def load(cls, path: Path) -> "SongMap":
         try:
             data = json.loads(Path(path).read_text())

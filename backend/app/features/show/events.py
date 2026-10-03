@@ -50,13 +50,13 @@ def intro(game: str, count: int, side: str | None = None) -> ShowEvent:
 
 
 # Showoff colours by turn (spec: verses lime then blue, everything else both = pink)
-_TURN_COLOR = {"L": "lime", "R": "blue", "both": "pink"}
+TURN_COLOR = {"L": "lime", "R": "blue", "both": "pink"}
 
 
 def playing(game: str, song_id: int, section: tuple[str, int] | None = None, turn: str | None = None,
             t: float = 0.0) -> ShowEvent:
     label, index = section or (None, None)
-    perimeter = Perimeter(look="turn", color=_TURN_COLOR[turn], side=turn) if turn else None
+    perimeter = Perimeter(look="turn", color=TURN_COLOR[turn], side=turn) if turn else None
     return _event("playing", {}, game=game, song=SongInfo(id=song_id, section=label, section_index=index, t=round(t, 2)),
                   turn=turn, perimeter=perimeter)
 

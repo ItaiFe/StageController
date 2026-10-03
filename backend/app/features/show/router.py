@@ -6,8 +6,13 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 
+from app.core.config import MUSIC_DIR
+from app.features.songs.models import Song
+
 from . import analytics, tunables
+from .events import TURN_COLOR
 from .service import save_tunable
+from .songmap import SongMap
 from .tunables import SPEC
 
 router = APIRouter(prefix="/show", tags=["show"])
@@ -21,6 +26,18 @@ class Note(BaseModel):
 def get_spec():
     """The stage spec, so the emulator draws the same palette and games as the controller."""
     return SPEC
+
+
+@router.get("/songmap/{song_id}")
+def get_songmap(song_id: int, db: Session = Depends(get_db)):
+    """Sections with their showoff turn, and the skip cutoff, for the emulator's timeline."""
+    song = db.get(Song, song_id)
+    if not song:
+        raise HTTPException(404, "Song not found")
+    m = SongMap.for_audio(song.file_path, MUSIC_DIR)
+    sections = [{**s, "turn": (turn := m.turn_owner((s["start"] + s["end"]) / 2)), "color": TURN_COLOR[turn]}
+                for s in m.sections]
+    return {"bpm": m.bpm, "has_markers": m.has_markers, "sections": sections, "skip_cutoff_s": m.skip_cutoff_s()}
 
 
 @router.post("/note")
@@ -47,7 +64,8 @@ def _number(v) -> bool:
 def list_tunables():
     """Every spec tunable with its current value, in the spec's order."""
     return [{"id": t["id"], "value": tunables.get(t["id"]), "default": t["value"], "unit": t["unit"],
-             "group": t["group"], "he": t["he"]} for t in SPEC["tunables"]]
+             "group": t["group"], "he": t["he"],
+             "mandatory": t["id"] in SPEC["tunablesUi"]["mandatory"]} for t in SPEC["tunables"]]
 
 
 @router.put("/tunables/{tunable_id}")

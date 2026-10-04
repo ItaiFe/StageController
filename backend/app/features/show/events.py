@@ -2,7 +2,7 @@
 from datetime import datetime
 
 from . import tunables
-from .schemas import ButtonLights, Perimeter, Pole, Poles, ShowCue, ShowEvent, SongInfo, ThunderInfo
+from .schemas import ButtonLights, Perimeter, Pole, Poles, ShowCue, ShowEvent, SongInfo
 
 OFF = Pole(pct=0, mode="off")
 
@@ -75,20 +75,22 @@ def buttons(game: str, singer: str, handover: bool = False) -> ButtonLights:
 
 def playing(game: str, song_id: int, section: tuple[str, int] | None = None, turn: str | None = None,
             t: float = 0.0, thunder=None, owner: str | None = None, handover: bool = False) -> ShowEvent:
-    """`thunder`: the thunder.Frame showing now, if any; it brings the poles and the perimeter (the
-    active pole's fill, the dark pole off; the blackout all off; the new look back to the glow).
-    `owner`: whose section it is (solo: none; duet: the singer; showoff: the turn; thunder: the
-    singer until a tag, then the performer who tagged); defaults to the showoff `turn`, else both."""
+    """`thunder`: the thunder.Frame showing now (thunder games only); it brings the poles, the
+    perimeter and the button rings (both in the players' colours, the rising one flickering with its
+    pole once full). `owner`: whose section it is (solo: none; duet: the singer; showoff: the turn);
+    defaults to the showoff `turn`, else both."""
     label, index = section or (None, None)
     perimeter = Perimeter(look="turn", color=TURN_COLOR[turn], side=turn) if turn else None
     singer = owner or turn or "both"
     poles, info = ambient(game, singer), None
+    rings = buttons(game, singer, handover)
     if thunder:
-        perimeter = thunder.perimeter
-        poles = poles if thunder.phase == "new_look" else thunder.poles
-        info = ThunderInfo(phase=thunder.phase, pole=thunder.pole, beat=thunder.beat)
+        perimeter, poles, info = thunder.perimeter, thunder.poles, thunder.info
+        lit = {s: p.color for s, p in thunder.poles.items()}
+        rings = ButtonLights(L=lit.get("L"), R=lit.get("R"),
+                             flicker=next((s for s, p in thunder.poles.items() if p.mode == "pulse"), None))
     return _event("playing", poles, game=game, song=SongInfo(id=song_id, section=label, section_index=index, t=round(t, 2)),
-                  turn=turn, perimeter=perimeter, thunder=info, buttons=buttons(game, singer, handover))
+                  turn=turn, perimeter=perimeter, thunder=info, buttons=rings)
 
 
 def legacy_start(game: str):
@@ -106,5 +108,5 @@ def fail_fade(lit: str) -> ShowEvent:
     return _event("failing", {lit: Pole(pct=100, color="white", mode="drain", ms=tunables.get("failFadeMs"))})
 
 
-def claps(side: str | None, reason: str = "claps") -> ShowCue:
-    return ShowCue(timestamp=datetime.now(), cue="claps", side=side, reason=reason)
+def claps(side: str | None) -> ShowCue:
+    return ShowCue(timestamp=datetime.now(), cue="claps", side=side)

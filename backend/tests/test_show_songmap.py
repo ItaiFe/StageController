@@ -51,11 +51,6 @@ def test_section_at_gives_label_and_index(song):
     assert song.section_at(1000) == ("outro", 1)  # past the end: still the last section
 
 
-def test_beat_lookups(song):
-    assert song.beat_at(28.607) == 0 and song.beat_at(29.2) == 1 and song.beat_at(1) == -1
-    assert song.beat_after(29.2) == 29.768 and song.beat_after(10_000) is None
-
-
 def test_no_sidecar_falls_back_to_the_tunables(tmp_path):
     song = SongMap.load(tmp_path / "nothing.analysis.json")
     assert not song.has_markers and song.section_at(5) is None
@@ -110,10 +105,10 @@ def test_songmap_endpoint_gives_sections_with_turn_colours_and_the_cutoff(tmp_pa
     assert verses == [(66.04, "L", "lime"), (104.77, "R", "blue"), (194.49, "L", "lime")]
     assert set(body["sections"][0]) == {"start", "end", "label", "index", "turn", "color", "singer", "singer_color"}
     assert [s["singer"] for s in body["sections"] if s["label"] == "verse"] == ["L", "R", "L"]  # untagged: the alternation
-    assert [round(w["change_s"], 1) for w in body["thunder_windows"]] == [126.7, 143.0, 180.5, 215.5]
+    assert "thunder_windows" not in body  # thunder is time-based, not tied to the song
     assert body["sections"][-1]["turn"] == "both" and body["skip_cutoff_s"] == pytest.approx(115.72)
     empty = client.get("/api/show/songmap/2").json()
-    assert empty["sections"] == [] and not empty["has_markers"] and empty["thunder_windows"] == []
+    assert empty["sections"] == [] and not empty["has_markers"]
     assert client.get("/api/show/songmap/9").status_code == 404
 
 

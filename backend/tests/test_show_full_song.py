@@ -17,14 +17,6 @@ DURATION_MS = 290_551
 STEP = 20
 
 
-class Pick:
-    def __init__(self, side):
-        self.side = side
-
-    def choice(self, options):
-        return self.side
-
-
 class Clock:
     t = 0
 
@@ -65,7 +57,7 @@ def jsonl(tmp_path, monkeypatch):
     tunables.clear_overrides()
 
 
-def run(launch, script=(), pole="L"):
+def run(launch, script=()):
     """launch: [(action, side, ago)] pressed at clock 0; script: [(song_t, action, side, ago)]."""
     clock = Clock()
     player = SongPlayer(clock)
@@ -75,7 +67,7 @@ def run(launch, script=(), pole="L"):
         if event.action == "show":
             events.append(event)
 
-    director = ShowDirector(player, clock, emit, analytics.append, rng=Pick(pole))
+    director = ShowDirector(player, clock, emit, analytics.append)
 
     async def main():
         for action, side, ago in launch:
@@ -158,45 +150,52 @@ def test_showoff_whole_song(jsonl):
 
 
 def thunder_phases(events):
-    """Phase and beat as they change (a section change re-sends the current frame)."""
-    return [k for k, _ in groupby((e.thunder.phase, e.thunder.beat) for e in playing(events) if e.thunder)]
+    """(phase, performer) as they change: the steal loop, time-based."""
+    return [k for k, _ in groupby((e.thunder.phase, e.thunder.performer) for e in playing(events) if e.thunder)]
 
 
-# a thunder window with nobody pressing: the full countdown, then the drain
-UNTOUCHED = [("build", k) for k in range(-8, -4)] + [("rush", k) for k in range(-4, 0)] + [
-    ("open", 0), ("window", 1), ("window", 2), ("window", 3)]
-# the windows after the first (end of instrumental 3, instrumental 4, verse 3), none pressed
-LATER = [{"type": "window", "section": n, "outcome": "none", "pressOffsetMs": None} for n in (7, 9, 11)]
+def first(events, phase, performer):
+    return next(e for e in playing(events) if e.thunder and (e.thunder.phase, e.thunder.performer) == (phase, performer))
 
 
-def test_thunder_whole_song_with_a_tag(jsonl):
-    # the right pillar's friend taps on the change; the pillar reports it 400 ms later
-    events, player = run([("special", "L", 0), ("special", "R", 40)], script=[(127.07, "start", "R", 400)], pole="R")
+THUNDER = [("special", "L", 0), ("special", "R", 40)]
+C = tunables.defaults()["cooldownMs"] / 1000  # seconds; the single source is spec.json
+
+
+def test_thunder_whole_song_with_steals(jsonl):
+    # right steals once its pole is full; left steals back once the cooldown has run again
+    events, player = run(THUNDER, script=[(C + 5, "start", "R", 0), (2 * C + 10, "start", "L", 0)])
     assert states(events) == EXPECTED_STATES
     assert [e.perimeter.side for e in events if e.state == "intro"] == ["L", "R", "centre"]
-    assert thunder_phases(events) == [("build", k) for k in range(-8, -4)] + [("rush", k) for k in range(-4, 0)] + [
-        ("open", 0), ("tag", 1), ("new_look", 1)] + UNTOUCHED * 3
-    tag = next(e for e in playing(events) if e.thunder and e.thunder.phase == "tag")
-    assert tag.song.t == pytest.approx(127.269, abs=0.021)
-    assert player.actions == ["special"]
+    assert thunder_phases(events) == [("cooldown", "L"), ("ready", "L"), ("steal", "R"), ("cooldown", "R"),
+                                      ("ready", "R"), ("steal", "L"), ("cooldown", "L"), ("ready", "L")]
+    # the cooldown restarts after a steal: from 0 once the blackout is over, full cooldownMs later
+    restart = first(events, "cooldown", "R")
+    assert restart.thunder.pct == 0 and restart.song.t == pytest.approx(C + 5.3, abs=0.03)
+    assert first(events, "ready", "R").song.t == pytest.approx(2 * C + 5.3, abs=0.03)
+    assert (restart.poles.R.color, restart.poles.R.pct, restart.poles.L.color, restart.poles.L.pct) == ("blue", 100, "lime", 0)
+    assert player.actions == ["special", "special"]  # a smoke puff per steal
     check_log(jsonl, "thunder", 6, extra=[
-        {"type": "press", "side": "R", "kind": "tag"},
-        {"type": "window", "songId": "1", "section": 5, "pole": "R", "outcome": "tag", "pressOffsetMs": 15,  # arrived on the 127.08 tick
-         "windowBeats": 4, "bpm": 103.4}, *LATER])
+        {"type": "press", "side": "R", "kind": "steal"}, {"type": "steal", "from": "L", "to": "R"},
+        {"type": "press", "side": "L", "kind": "steal"}, {"type": "steal", "from": "R", "to": "L"}])
+    waited = [l["waitedMs"] for l in lines(jsonl) if l["type"] == "steal"]
+    assert waited == [pytest.approx(5000, abs=40), pytest.approx(4700, abs=40)]
 
 
-def test_thunder_whole_song_with_an_early_press(jsonl):
-    events, player = run([("special", "L", 0), ("special", "R", 40)], script=[(124.5, "start", "L", 400)], pole="L")
-    assert thunder_phases(events) == [("build", k) for k in range(-8, -4)] + [("rush", -4), ("early", -4)] + UNTOUCHED * 3
-    early = next(e for e in playing(events) if e.thunder and e.thunder.phase == "early")
-    assert (early.poles.L.mode, early.poles.L.pct, early.perimeter.look) == ("drain", 62, "halo")
+def test_thunder_whole_song_an_early_press_is_ignored(jsonl):
+    events, player = run(THUNDER, script=[(C / 2, "start", "R", 0), (C * 0.8, "start", "L", 0)])
+    assert thunder_phases(events) == [("cooldown", "L"), ("ready", "L")]  # left keeps the stage, no timeout
     assert player.actions == []
-    check_log(jsonl, "thunder", 6, extra=[
-        {"type": "press", "side": "L", "kind": "early"},
-        {"type": "window", "section": 5, "pole": "L", "outcome": "early", "pressOffsetMs": -2565}, *LATER])
+    check_log(jsonl, "thunder", 6, extra=[{"type": "press", "side": "R", "kind": "early"},
+                                          {"type": "press", "side": "L", "kind": "ordinary"}])  # the performer's own pole
 
 
 def test_thunder_whole_song_without_a_press(jsonl):
-    events, _ = run([("special", "L", 0), ("special", "R", 40)], pole="L")
-    assert thunder_phases(events) == UNTOUCHED * 4
-    check_log(jsonl, "thunder", 6, extra=[{"type": "window", "section": 5, "outcome": "none", "pressOffsetMs": None}, *LATER])
+    events, _ = run(THUNDER)
+    assert thunder_phases(events) == [("cooldown", "L"), ("ready", "L")]
+    rising = [e.thunder.pct for e in playing(events) if e.thunder and e.thunder.phase == "cooldown"]
+    assert rising == sorted(rising) and rising[0] == 0 and rising[-1] == 99
+    ready = first(events, "ready", "L")
+    assert ready.song.t == pytest.approx(C, abs=0.03)
+    assert (ready.poles.R.mode, ready.poles.R.ms, ready.buttons.flicker) == ("pulse", 500, "R")
+    check_log(jsonl, "thunder", 6)

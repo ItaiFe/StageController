@@ -36,9 +36,11 @@ class SongInfo(BaseModel):
 
 
 class ThunderInfo(BaseModel):
-    phase: str
-    pole: Side
-    beat: int
+    """The steal loop: `performer` owns the stage (pole full); the other pole is at `pct` of the
+    cooldown. cooldown = rising, ready = full and flickering (a steal is open), steal = the blackout."""
+    phase: Literal["cooldown", "ready", "steal"]
+    performer: Side
+    pct: int
 
 
 class ButtonLights(BaseModel):
@@ -47,6 +49,7 @@ class ButtonLights(BaseModel):
     `pulse_ms`, then settle on these colours. A later event without a pulse does not cut it short."""
     L: str | None = None
     R: str | None = None
+    flicker: Side | None = None  # thunder: this ring flickers with its pole (steal open)
     pulses: int = 0
     pulse_ms: int = 0
 
@@ -75,4 +78,3 @@ class ShowCue(BaseModel):
     timestamp: datetime
     cue: Literal["claps"]
     side: Literal["L", "R"] | None = None
-    reason: Literal["claps", "applause"] = "claps"  # 2 taps in a song | thunder's dark-pole applause

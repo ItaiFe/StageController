@@ -206,7 +206,7 @@
     },
     "applause": {
       "gesture": "5+ presses, one button",
-      "thunderException": "during countdown/window only the dark pole can applaud"
+      "thunderException": "none: claps work as in every song (thunder rework 2026-10-03)"
     },
     "stop": {
       "gesture": "long press on both buttons together (within syncWindowMs of each other)",
@@ -214,59 +214,13 @@
     }
   },
   "thunder": {
-    "firstWindowAt": "the section change that ends verse 2",
-    "everySections": 2,
-    "windowsAt": "the end of verse 2, then every everySections-th section change after it to the end of the song; never at a change into the final section; a window whose countdown would start before the previous window ends is dropped",
-    "why": "first window is after verse 2, which is after the skip cutoff; a countdown only exists to lead into a window",
-    "poleChoice": "random per window; the other pole is dark",
-    "phases": [
-      {
-        "id": "rest",
-        "pole": "dark/dim"
-      },
-      {
-        "id": "build",
-        "beats": "-countdownBeats..-rushBeats-1",
-        "pole": "+100/countdownBeats % per beat, stepwise (12.5% at 8 beats)"
-      },
-      {
-        "id": "rush",
-        "beats": "-rushBeats..-1",
-        "pole": "keeps climbing to 100%, pulses at double rate"
-      },
-      {
-        "id": "open",
-        "beats": "0",
-        "pole": "100% solid white"
-      },
-      {
-        "id": "window",
-        "beats": "0..W",
-        "pole": "drains 100/W % per beat"
-      },
-      {
-        "id": "tag",
-        "trigger": "press on active pole in [sectionChange - graceMs, windowEnd]",
-        "fireAt": "first beat >= max(sectionChange, press)",
-        "effect": "half-beat blackout, new look, smoke puff"
-      },
-      {
-        "id": "early",
-        "trigger": "press on active pole after countdown start and before sectionChange - graceMs",
-        "effect": "pole falls to 0 in earlyFallMs; countdown and window cancelled; whoever is on stage gets an empowering halo for flareBars"
-      },
-      {
-        "id": "none",
-        "trigger": "no press",
-        "effect": "performer keeps the stage"
-      }
-    ],
-    "windowBeats": "windowBeatsShort if that lasts >= minWindowMs, else windowBeatsLong",
-    "defend": "early press by the performer or a friend is allowed on purpose (feature)",
-    "benched": [
-      "riser sound under the last 4 beats"
-    ],
-    "illustrationOnly": "perimeter chase rings, downbeat flicker and button blink in the demo are not decided"
+    "rule": "user rule 2026-10-03, overrides the spec's beat-based countdown and windows: a time-based steal loop, independent of the song and its sections",
+    "loop": "the performer's pole is full in the performer's colour; the other pole rises 0 -> 100 % in its own colour over cooldownMs; at 100 % it flickers (fade up/down at flickerHz): a steal is open, no timeout; a 1-tap from the flickering side steals: roles swap, stealBlackoutMs blackout + smoke puff, the cooldown restarts for the one who lost the stage; repeats until the song ends or stop",
+    "firstPerformer": "L",
+    "earlyPress": "a press on the rising pole before 100 % is ignored (stealBeforeFull = true makes it a steal)",
+    "performerPress": "ignored",
+    "applause": "normal claps from either side (2 taps)",
+    "buttons": "each ring in its player's colour; the rising side's ring flickers with its pole once full"
   },
   "tunables": [
     {
@@ -400,74 +354,36 @@
       "he": "כמה זמן נמשכים כל ההבהובים של החלפת הזמר, יחד"
     },
     {
-      "id": "countdownBeats",
+      "id": "cooldownMs",
       "group": "סיבוב הרעם",
-      "value": 8,
-      "unit": "beats",
-      "he": "אורך הספירה לפני שינוי הבית"
-    },
-    {
-      "id": "rushBeats",
-      "group": "סיבוב הרעם",
-      "value": 4,
-      "unit": "beats",
-      "he": "כמה ביטים מהספירה בדהירה (פעימות כפולות)"
-    },
-    {
-      "id": "windowBeatsShort",
-      "group": "סיבוב הרעם",
-      "value": 4,
-      "unit": "beats",
-      "he": "אורך החלון הרגיל"
-    },
-    {
-      "id": "windowBeatsLong",
-      "group": "סיבוב הרעם",
-      "value": 8,
-      "unit": "beats",
-      "he": "אורך החלון בשירים מהירים"
-    },
-    {
-      "id": "minWindowMs",
-      "group": "סיבוב הרעם",
-      "value": 2000,
+      "value": 20000,
       "unit": "ms",
-      "he": "חלון קצר מזה? עוברים לארוך"
+      "note": "added by Tom, 2026-10-03 (thunder rework, not in the spec)",
+      "he": "כמה זמן לוקח לעמוד של המתחרה להתמלא עד שאפשר לגנוב את הבמה"
     },
     {
-      "id": "graceMs",
+      "id": "flickerHz",
       "group": "סיבוב הרעם",
-      "value": 150,
+      "value": 2,
+      "unit": "Hz",
+      "note": "added by Tom, 2026-10-03 (thunder rework, not in the spec)",
+      "he": "קצב ההבהוב (דעיכה פנימה והחוצה) של העמוד המלא, כשאפשר לגנוב"
+    },
+    {
+      "id": "stealBlackoutMs",
+      "group": "סיבוב הרעם",
+      "value": 300,
       "unit": "ms",
-      "he": "עד כמה לפני שינוי הבית לחיצה עדיין נחשבת בזמן"
+      "note": "added by Tom, 2026-10-03 (thunder rework, not in the spec)",
+      "he": "החשכה קצרה בגניבה, עם פוף עשן"
     },
     {
-      "id": "earlyFallMs",
+      "id": "stealBeforeFull",
       "group": "סיבוב הרעם",
-      "value": 500,
-      "unit": "ms",
-      "he": "כמה זמן לוקח לאור ליפול בלחיצה מוקדמת"
-    },
-    {
-      "id": "flareBars",
-      "group": "סיבוב הרעם",
-      "value": 1,
-      "unit": "bars",
-      "he": "אורך ההילה למי שעל הבמה אחרי לחיצה מוקדמת"
-    },
-    {
-      "id": "fallbackCountdownMs",
-      "group": "סיבוב הרעם",
-      "value": 4000,
-      "unit": "ms",
-      "he": "ספירה בשיר בלי ביטים"
-    },
-    {
-      "id": "fallbackWindowMs",
-      "group": "סיבוב הרעם",
-      "value": 2500,
-      "unit": "ms",
-      "he": "חלון בשיר בלי ביטים"
+      "value": false,
+      "unit": "bool",
+      "note": "added by Tom, 2026-10-03 (thunder rework, not in the spec)",
+      "he": "לחיצה לפני שהעמוד מלא: false = מתעלמים, true = גניבה"
     },
     {
       "id": "fallbackTurnMs",
@@ -521,8 +437,8 @@
       "playlists": [
         "solo|duet|showoff|thunder"
       ],
-      "bpm": "number (thunder)",
-      "beats": "seconds[] (thunder)",
+      "bpm": "number",
+      "beats": "seconds[]",
       "sections": [
         {
           "type": "intro|verse|chorus|bridge|outro",
@@ -574,8 +490,7 @@
     "showoff.turnLeft",
     "showoff.turnRight",
     "showoff.together",
-    "thunder.tag",
-    "thunder.early"
+    "thunder.steal"
   ],
   "analytics": {
     "logFormat": "append-only JSONL on the controller, one line per event: {t: ISO time, mono: ms since boot, type, ...fields}. Pull the file after the event. No network needed.",
@@ -613,19 +528,16 @@
         "type": "press",
         "fields": {
           "side": "L|R",
-          "kind": "skip|applause|stop|tag|early|dark|ordinary"
+          "kind": "skip|applause|stop|steal|early|ordinary"
         }
       },
       {
-        "type": "window",
+        "type": "steal",
         "fields": {
           "songId": "string",
-          "section": "int (1-based, the section whose end the window is at)",
-          "pole": "L|R",
-          "outcome": "tag|early|none",
-          "pressOffsetMs": "int|null (relative to the section change)",
-          "windowBeats": "int",
-          "bpm": "number"
+          "from": "L|R (who lost the stage)",
+          "to": "L|R (the stealer)",
+          "waitedMs": "int (from the pole reaching 100 % to the steal)"
         }
       },
       {
@@ -745,29 +657,24 @@
         "q": "זה עובד ברגע האמת?",
         "metrics": [
           {
-            "he": "החלפות",
-            "f": "חלונות עם החלפה ÷ חלונות שנפתחו",
-            "src": "window.outcome=tag"
+            "he": "החלפות לשיר",
+            "f": "כמה גניבות בכל שיר",
+            "src": "steal, song_start"
+          },
+          {
+            "he": "זמן תגובה",
+            "f": "מילישניות מהבהוב ועד הלחיצה",
+            "src": "steal.waitedMs"
           },
           {
             "he": "לחיצות מוקדמות",
-            "f": "לחיצות מוקדמות ÷ חלונות שנפתחו",
-            "src": "window.outcome=early"
-          },
-          {
-            "he": "דיוק",
-            "f": "מילישניות מול החלפת הבית",
-            "src": "window.pressOffsetMs"
-          },
-          {
-            "he": "החלפות לשיר",
-            "f": "כמה החלפות בכל שיר",
-            "src": "window, song_start"
+            "f": "לחיצות לפני 100 % ÷ גניבות",
+            "src": "press.kind=early, steal"
           }
         ],
         "chart": "hist",
-        "chartCap": "דיוק הלחיצות סביב החלפת הבית",
-        "learn": "לכוונן את אורך החלון או את בהירות הספירה"
+        "chartCap": "זמן התגובה מהבהוב ועד גניבה",
+        "learn": "לכוונן את cooldownMs או את בהירות ההבהוב"
       },
       {
         "id": "ops",

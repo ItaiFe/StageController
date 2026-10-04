@@ -87,14 +87,17 @@ def test_the_glow_level_is_a_tunable():
         tunables.clear_overrides()
 
 
-def test_a_thunder_frame_replaces_the_glow_except_for_the_new_look():
-    from app.features.show.thunder import Frame
-    fill = Pole(pct=50, color="white", mode="solid")
-    ev = events.playing("thunder", 7, thunder=Frame("build", -4, "L", {"L": fill}), owner="both")
-    assert glows(ev) == {"L": "solid", "R": "off"}  # the dark pole is off
-    assert glows(events.playing("thunder", 7, thunder=Frame("tag", 1, "L", {}))) == {"L": "off", "R": "off"}
-    # after a tag the tagger owns the stage: the new look glows their colour
-    assert glows(events.playing("thunder", 7, thunder=Frame("new_look", 1, "L", {}), owner="L")) == {"L": ("lime", 35), "R": "off"}
+def test_a_thunder_frame_brings_the_poles_the_perimeter_and_the_rings():
+    from app.features.show.thunder import Thunder
+    cd = tunables.get("cooldownMs")
+    ev = events.playing("thunder", 7, thunder=Thunder(0).frame(cd))
+    assert (ev.poles.L.color, ev.poles.L.mode, ev.poles.R.color, ev.poles.R.mode) == ("lime", "solid", "blue", "pulse")
+    assert (ev.thunder.phase, ev.thunder.performer, ev.thunder.pct) == ("ready", "L", 100)
+    assert (ev.buttons.L, ev.buttons.R, ev.buttons.flicker) == ("lime", "blue", "R")
+    th = Thunder(0)
+    th.press("R", cd)
+    dark = events.playing("thunder", 7, thunder=th.frame(cd + 100))
+    assert glows(dark) == {"L": "off", "R": "off"} and dark.perimeter.look == "blackout"
 
 
 def test_event_serialises_to_the_documented_envelope():

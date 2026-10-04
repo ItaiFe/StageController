@@ -4,8 +4,6 @@ All time comes from the injected clock and the player behind a small adapter, so
 whole launches instantly without mpv or a database. The real adapter is StagePlayer.
 """
 import asyncio
-import math
-import random
 import time
 from dataclasses import dataclass
 from functools import partial
@@ -110,10 +108,9 @@ async def _broadcast(event) -> None:
 
 
 class ShowDirector:
-    def __init__(self, player, clock, emit, log=None, rng=None):
+    def __init__(self, player, clock, emit, log=None):
         self._player = player
-        self._rng = rng or random.Random()
-        self._thunder: Thunder | None = None
+        self._thunder: Thunder | None = None  # the steal loop, in a thunder song
         self._clock = clock
         self._emit = emit
         self._log_to = log
@@ -121,14 +118,13 @@ class ShowDirector:
         self._song_id: int | None = None
         self._song_started_ms = 0
         self._t = 0.0  # song time at the last tick
-        self._key = None  # (section, turn, thunder phase and beat) of the last playing event
+        self._key = None  # (section, turn, thunder frame key, owner) of the last playing event
         self._arbiter = LaunchArbiter()
         self._poles: dict[str, Pole] = {}
         self._timeline: list[tuple[int, object]] = []  # (due_ms, async callable), in due order
         self._background: set[asyncio.Task] = set()
         self.state = "idle"
         self.game: str | None = None
-        self._performer: str | None = None  # thunder: who tagged last (owns the stage until the next tag)
 
     async def on_press(self, action: str, side: str, first_press_ago_ms: int = 0, taps: int | None = None) -> dict:
         now = self._clock.now_ms()
@@ -153,20 +149,17 @@ class ShowDirector:
         if self.state != "playing":
             return self._ignored(action, self.state)
         what = IN_SONG[action]
-        if self._thunder and (status := self._player.status()):
-            # the pillar reports a gesture after its release: the press was first_press_ago_ms earlier
-            kind = self._thunder.press(side, what, status.t - first_press_ago_ms / 1000, status.t)
-            if kind == "blocked":
-                self._log("press", side=side, kind="ordinary")
-                return self._ignored(action, "active_pole")
-            if kind:
-                self._log("press", side=side, kind=kind)
-                if kind == "dark":
-                    await self._emit(events.claps(side, "applause"))
-                    await self._player.run_action("claps")
-                else:
-                    await self._follow(status)  # early falls now; both log their window
-                return self._ok(action, side)
+        if self._thunder and what == "tap":
+            # the steal loop is time-based: the press counts when it arrives, not when it was made
+            kind, fields = self._thunder.press(side, now)
+            self._log("press", side=side, kind=kind if kind != "performer" else "ordinary")
+            if kind != "steal":
+                return {**self._ignored(action, "too_early" if kind == "early" else "performer"), **fields}
+            self._log("steal", songId=str(self._song_id), **fields)
+            self._background_run(self._player.run_action("special"))  # the smoke puff, off the tick
+            if status := self._player.status():
+                await self._follow(status)  # the blackout goes out now
+            return self._ok(action, side)
         if what == "skip" and (status := self._player.status()) and status.t > self._map.skip_cutoff_s():
             self._log("press", side=side, kind="ordinary")
             return self._ignored(action, "after_cutoff")
@@ -262,8 +255,7 @@ class ShowDirector:
         self._song_started_ms = self._clock.now_ms()
         self._key = None
         self._map = self._player.song_map()
-        self._thunder = Thunder(self._map, self._rng) if self.game == "thunder" else None
-        self._performer = None
+        self._thunder = Thunder(self._clock.now_ms()) if self.game == "thunder" else None
         self._log("song_start", songId=str(song_id), game=self.game, bpm=self._map.bpm,
                   hasSections=self._map.has_markers, hasBeats=bool(self._map.beats))
         if not self._map.has_markers:
@@ -272,7 +264,7 @@ class ShowDirector:
             await self._follow(status)
 
     async def _follow(self, status: SongStatus) -> None:
-        """One playing event whenever the section, the showoff turn or the thunder beat changes."""
+        """One playing event whenever the section, the showoff turn, the singer or the thunder frame changes."""
         if status.id != self._song_id:  # changed under us (web UI Next): a new song needs its own map
             self._end_song("skip")
             await self._begin_song(status.id)
@@ -280,35 +272,22 @@ class ShowDirector:
         self._t = status.t
         section = self._map.section_at(status.t)
         turn = self._map.turn_owner(status.t, status.duration) if self.game == "showoff" else None
-        frame = self._thunder.frame(status.t) if self._thunder else None
-        if frame and frame.phase == "tag":
-            self._performer = frame.pole
+        frame = self._thunder.frame(self._clock.now_ms()) if self._thunder else None
         owner = self._owner(status)
-        key = (section, turn, frame and (frame.phase, frame.beat), owner)
+        key = (section, turn, frame and frame.key, owner)
         if key != self._key:
-            was_tag = bool(self._key and self._key[2] and self._key[2][0] == "tag")
             new_section = not self._key or self._key[0] != section
             singer = owner or turn or "both"
             handover = self._key is not None and singer != (self._key[3] or self._key[1] or "both")
             self._key = key
             await self._emit(events.playing(self.game, status.id, section, turn, status.t, frame, owner, handover))
-            if frame and frame.phase == "tag" and not was_tag:
-                # the smoke puff; scene design comes later. In the background: the special sequence may
-                # wait between its steps, and the show must keep ticking through the blackout meanwhile
-                self._background_run(self._player.run_action("special"))
-                await asyncio.sleep(0)  # let it start now
             if new_section:
                 self._background_run(self._scene(section))
                 await asyncio.sleep(0)
-        if self._thunder:
-            for w in self._thunder.to_log(status.t):
-                self._log("window", **w.record(status.id, self._map.bpm))
 
     def _owner(self, status: SongStatus) -> str | None:
-        """Whose section it is, for the poles' glow."""
-        if self.game == "thunder" and self._performer:
-            return self._performer
-        if self.game in ("duet", "thunder"):
+        """Whose section it is, for the poles' glow (thunder's frame brings its own poles)."""
+        if self.game == "duet":
             return self._map.singer(status.t, status.duration)
         return None  # showoff: the turn
 
@@ -329,9 +308,6 @@ class ShowDirector:
             await self.to_idle()
 
     def _end_song(self, reason: str) -> None:
-        if self._thunder and self._song_id is not None:  # a window cut short by stop/skip still logs
-            for w in self._thunder.to_log(math.inf):
-                self._log("window", **w.record(self._song_id, self._map.bpm))
         self._thunder = None
         if self._song_id is None:
             return

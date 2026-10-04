@@ -51,17 +51,8 @@ class FakePlayer:
             self.loaded = False
 
 
-class Pick:
-    """RNG stub: every thunder window goes to this pole."""
-    def __init__(self, side):
-        self.side = side
-
-    def choice(self, options):
-        return self.side
-
-
 class Rig:
-    def __init__(self, song_id=1, rng=None):
+    def __init__(self, song_id=1):
         self.clock = FakeClock()
         self.player = FakePlayer(song_id)
         self.events = []  # show events
@@ -71,8 +62,7 @@ class Rig:
         async def emit(event):
             (self.events if event.action == "show" else self.legacy).append((self.clock.t, event))
 
-        self.director = ShowDirector(self.player, self.clock, emit, lambda kind, mono, /, **f: self.log.append((kind, mono, f)),
-                                     rng=rng)
+        self.director = ShowDirector(self.player, self.clock, emit, lambda kind, mono, /, **f: self.log.append((kind, mono, f)))
 
     def press(self, action, side, ago=0, taps=None):
         return asyncio.run(self.director.on_press(action, side, ago, taps))
@@ -429,74 +419,17 @@ def thunder_events(rig):
     return [e for e in playing_events(rig) if e.thunder]
 
 
-def play_thunder(side="L"):
-    rig = Rig(rng=Pick(side))
-    play_game(rig, "special")
-    seek(rig, 120.0)
-    return rig
 
 
-def test_thunder_countdown_and_window_one_event_per_beat():
-    rig = play_thunder("R")
-    play_song(rig, 130)
-    got = [(e.thunder.phase, e.thunder.beat, e.thunder.pole, e.poles.R.pct, e.poles.R.mode, e.poles.L.mode)
-           for e in thunder_events(rig)]
-    assert [g[:2] for g in got] == [("build", k) for k in range(-8, -4)] + [("rush", k) for k in range(-4, 0)] + [
-        ("open", 0), ("window", 1), ("window", 2), ("window", 3)]
-    assert [g[3] for g in got] == [12, 25, 38, 50, 62, 75, 88, 100, 100, 75, 50, 25]
-    assert {g[2] for g in got} == {"R"} and {g[5] for g in got} == {"off"}
-    assert [e.song.t for e in thunder_events(rig)][0] == pytest.approx(121.951, abs=0.021)
-    assert playing_events(rig)[-1].thunder is None and playing_events(rig)[-1].poles.R.mode == "glow"  # rest after: the white glow
-    assert kinds(rig, "window") == [{"songId": "1", "section": 5, "pole": "R", "outcome": "none", "pressOffsetMs": None,
-                                     "windowBeats": 4, "bpm": 103.4}]
 
-
-def test_thunder_tag_blacks_out_on_the_beat_and_puffs_smoke():
-    rig = play_thunder("L")
-    play_song(rig, 127.0)
-    assert rig.press("start", "L", ago=400)["status"] == "ok"  # pressed at 126.6, in the grace
-    assert rig.player.actions == []
-    play_song(rig, 127.26)
-    assert rig.player.actions == []  # waits for the beat after the arrival
-    play_song(rig, 127.3)
-    assert rig.player.actions == ["special"]
-    tag = thunder_events(rig)[-1]
-    assert (tag.thunder.phase, tag.thunder.beat, tag.poles.L.mode, tag.perimeter.look) == ("tag", 1, "off", "blackout")
-    play_song(rig, 130)
-    assert [e.thunder.phase for e in thunder_events(rig)][-2:] == ["tag", "new_look"]
-    assert rig.player.actions == ["special"]
-    assert [f["kind"] for f in kinds(rig, "press")] == ["tag"]
-    assert [(f["outcome"], f["pressOffsetMs"]) for f in kinds(rig, "window")] == [("tag", -65)]
-
-
-def test_thunder_early_press_falls_at_once_and_cancels_the_window():
-    rig = play_thunder("L")
-    play_song(rig, 123.0)
-    rig.press("start", "L", ago=400)
-    early = playing_events(rig)[-1]
-    assert (early.thunder.phase, early.poles.L.mode, early.poles.L.pct, early.poles.L.ms, early.perimeter.look) == (
-        "early", "drain", 25, 500, "halo")
-    play_song(rig, 130)
-    assert "open" not in [e.thunder.phase for e in thunder_events(rig)]
-    assert [f["outcome"] for f in kinds(rig, "window")] == ["early"]
-    assert [f["kind"] for f in kinds(rig, "press")] == ["early"]
-
-
-def test_thunder_only_the_dark_pole_applauds_during_the_countdown():
-    rig = play_thunder("L")
-    play_song(rig, 123.0)
-    assert rig.press("claps", "L")["reason"] == "active_pole"
-    assert rig.press("claps", "R")["status"] == "ok"
-    assert rig.player.actions == ["claps"]
-    assert [f["kind"] for f in kinds(rig, "press")] == ["ordinary", "dark"]
 
 
 def test_other_games_have_no_thunder():
-    rig = Rig(rng=Pick("L"))
+    rig = Rig()
     play_game(rig, "start")
     seek(rig, 120.0)
     play_song(rig, 130)
-    assert thunder_events(rig) == [] and kinds(rig, "window") == []
+    assert thunder_events(rig) == [] and kinds(rig, "steal") == []
 
 
 def test_a_song_changed_from_the_web_ui_reloads_the_song_map():
@@ -510,31 +443,6 @@ def test_a_song_changed_from_the_web_ui_reloads_the_song_map():
     assert playing_events(rig)[-1].song.id == 2 and playing_events(rig)[-1].song.section is None
 
 
-def test_a_window_cut_short_by_stop_is_still_logged():
-    rig = play_thunder("R")
-    play_song(rig, 127.5)
-    rig.press("stop", "L")
-    assert [f["outcome"] for f in kinds(rig, "window")] == ["none"]
-
-
-def test_thunder_tag_smoke_does_not_hold_up_the_show():
-    """The special sequence waits between its steps; the blackout and the new look must not wait for it."""
-    import time
-    rig = play_thunder("L")
-    play_song(rig, 127.0)
-    rig.press("start", "L", ago=400)
-    started = []
-
-    async def slow(action):
-        started.append(action)
-        await asyncio.sleep(5)
-
-    rig.player.run_action = slow
-    t0 = time.monotonic()
-    play_song(rig, 130)
-    assert time.monotonic() - t0 < 4
-    assert started == ["special"]
-    assert [e.thunder.phase for e in thunder_events(rig)][-2:] == ["tag", "new_look"]
 
 
 @pytest.mark.parametrize("t, flood, spot", [
@@ -642,18 +550,9 @@ def test_no_handover_pulse_without_a_change_of_singer():
     assert {(e.buttons.L, e.buttons.R, e.buttons.pulses) for e in playing_events(rig)} == {("pink", "pink", 0)}
 
 
-def test_thunder_poles_follow_the_singer_until_a_tag_then_the_tagger():
-    rig = play_thunder("L")
-    assert (playing_events(rig)[-1].poles.L.color, playing_events(rig)[-1].poles.R.color) == (None, "blue")  # verse 2
-    play_song(rig, 127.0)
-    rig.press("start", "L", ago=400)
-    play_song(rig, 135)
-    last = playing_events(rig)[-1]
-    assert last.thunder is None and (last.poles.L.color, last.poles.L.mode, last.poles.R.mode) == ("lime", "glow", "off")
-
 
 def cues(rig):
-    return [(e.cue, e.side, e.reason) for _, e in rig.legacy if e.action == "cue"]
+    return [(e.cue, e.side) for _, e in rig.legacy if e.action == "cue"]
 
 
 def test_claps_announce_a_cue_before_the_sequence_runs():
@@ -661,12 +560,91 @@ def test_claps_announce_a_cue_before_the_sequence_runs():
     play_solo(rig)
     rig.press("claps", "R")
     rig.press("special", "R")
-    assert cues(rig) == [("claps", "R", "claps")]  # special has no cue
+    assert cues(rig) == [("claps", "R")]  # special has no cue
 
 
-def test_thunder_dark_pole_applause_is_a_claps_cue_the_active_pole_none():
-    rig = play_thunder("L")
-    play_song(rig, 122.5)
+def play_thunder(rig=None):
+    rig = rig or Rig()
+    play_game(rig, "special")
+    return rig
+
+
+def wait(rig, ms):
+    """Song and clock run together, so thunder's time-based loop sees the real time."""
+    play_song(rig, round(rig.player.t + ms / 1000, 3))
+
+
+def cooldown():
+    return tunables.get("cooldownMs")
+
+
+def test_thunder_full_rise_takes_the_cooldown_setting_20_s():
+    assert tunables.defaults()["cooldownMs"] == 20000  # the user's number, set once in spec.json
+    rig = play_thunder()
+    start = rig.clock.t
+    wait(rig, cooldown())
+    ready = next(t for t, e in rig.events if e.thunder and e.thunder.phase == "ready")
+    assert ready - start == pytest.approx(20000, abs=STEP)
+    last = thunder_events(rig)[-1]
+    assert (last.thunder.performer, last.poles.L.pct, last.poles.R.pct, last.poles.R.mode) == ("L", 100, 100, "pulse")
+
+
+def test_thunder_rise_follows_the_cooldown_setting():
+    tunables.set_override("cooldownMs", 8000)
+    rig = play_thunder()
+    start = rig.clock.t
+    wait(rig, 9000)
+    ready = next(t for t, e in rig.events if e.thunder and e.thunder.phase == "ready")
+    assert ready - start == pytest.approx(8000, abs=STEP)
+
+
+def test_thunder_steal_swaps_roles_blacks_out_puffs_smoke_and_restarts_the_cooldown():
+    rig = play_thunder()
+    wait(rig, cooldown() + 1000)
+    assert rig.press("start", "R")["status"] == "ok"
+    wait(rig, 100)
+    assert rig.player.actions == ["special"]
+    assert thunder_events(rig)[-1].perimeter.look == "blackout"
+    wait(rig, 300)
+    after = thunder_events(rig)[-1]
+    assert (after.thunder.phase, after.thunder.performer, after.poles.R.pct, after.poles.R.color) == ("cooldown", "R", 100, "blue")
+    assert after.poles.L.color == "lime" and after.poles.L.pct < 5
+    assert [f["kind"] for f in kinds(rig, "press")] == ["steal"]
+    assert [(f["from"], f["to"]) for f in kinds(rig, "steal")] == [("L", "R")]
+    wait(rig, cooldown())
+    assert thunder_events(rig)[-1].thunder.phase == "ready"  # the cooldown ran again, for the left
+
+
+def test_thunder_early_and_performer_presses_are_ignored():
+    rig = play_thunder()
+    wait(rig, cooldown() // 4)
+    res = rig.press("start", "R")
+    assert (res["status"], res["reason"]) == ("ignored", "too_early")
+    assert rig.press("start", "L")["reason"] == "performer"
+    assert rig.player.actions == [] and kinds(rig, "steal") == []
+    assert [f["kind"] for f in kinds(rig, "press")] == ["early", "ordinary"]
+
+
+def test_thunder_claps_work_as_in_every_song():
+    rig = play_thunder()
     rig.press("claps", "L")
-    rig.press("claps", "R")
-    assert cues(rig) == [("claps", "R", "applause")]
+    assert cues(rig) == [("claps", "L")] and rig.player.actions == ["claps"]
+
+
+def test_thunder_steal_smoke_does_not_hold_up_the_show():
+    """The special sequence waits between its steps; the blackout and the restart must not wait for it."""
+    import time
+    rig = play_thunder()
+    wait(rig, cooldown() + 100)
+    started = []
+
+    async def slow(action):
+        started.append(action)
+        await asyncio.sleep(5)
+
+    rig.player.run_action = slow
+    rig.press("start", "R")
+    t0 = time.monotonic()
+    wait(rig, 1000)
+    assert time.monotonic() - t0 < 4 and started == ["special"]
+    assert thunder_events(rig)[-1].thunder.phase == "cooldown"

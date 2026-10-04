@@ -1,176 +1,76 @@
-"""Thunder round (spec `thunder`): the countdown and window at section changes, and what a press on a
-pole means there. The first window is at the change that ends verse 2; after that one every
-`thunder.everySections` section changes to the end of the song, never into the final section, and
-never when its countdown would start before the previous window has ended.
+"""Thunder: the steal loop (user rule, 2026-10-03; replaces the spec's beat-based countdown and
+windows). Time-based, independent of the song and its sections.
 
-Pure: no player or DB, time is always song seconds passed in, and the pole choice comes from an
-injected RNG (anything with `choice`). Everything is relative to beat 0, the beat nearest the section
-change; that beat *is* the change for grace, firing and offsets, so a tag pressed on the change
-fires on it rather than a beat later when the analyzer's section edge sits a few ms after it.
-A song without beats gets an even grid instead: countdownBeats steps over fallbackCountdownMs,
-windowBeatsShort steps over fallbackWindowMs.
-
-Ending: the round ends with the last performer alone on stage (spec open question, design D10):
-nothing special happens at song end.
+The performer's pole is full in the performer's colour. The other player's pole rises 0 -> 100 %
+in their colour over `cooldownMs`; at 100 % it flickers (fade up/down at `flickerHz`): a steal is
+open, with no timeout. A 1-tap from the flickering side steals: the roles swap, a short blackout
+(`stealBlackoutMs`) and the smoke puff, and the cooldown restarts for the one who lost the stage.
+A press on the rising pole before 100 % is ignored (`stealBeforeFull` switches that to a steal),
+a press on the performer's pole is ignored. Left performs first.
 """
-from bisect import bisect_left, bisect_right
 from dataclasses import dataclass
 
 from . import tunables
-from .schemas import Perimeter, Pole
-from .songmap import SongMap
+from .events import TURN_COLOR
+from .schemas import Perimeter, Pole, ThunderInfo
 
-THUNDER_ENDING = "last performer alone"  # placeholder until the spec decides (design D10)
-BEATS_PER_BAR = 4
-COLOR = "white"
+OTHER = {"L": "R", "R": "L"}
 
 
 @dataclass
 class Frame:
-    """What the stage shows at one moment of a window. Poles not listed are dark."""
-    phase: str  # build | rush | open | window | tag | new_look | early
-    beat: int  # relative to beat 0
-    pole: str  # the active pole
+    """What thunder shows now: the poles, the perimeter and the info for the event."""
     poles: dict[str, Pole]
-    perimeter: Perimeter | None = None
+    perimeter: Perimeter
+    info: ThunderInfo
 
-
-class Window:
-    def __init__(self, section: int, pole: str, grid: list[float], b0: int, window_beats: int):
-        self.section, self.pole, self.window_beats = section, pole, window_beats  # section: 1-based, the one ending
-        self._grid, self._b0 = grid, b0
-        self.countdown_beats = tunables.get("countdownBeats")
-        self.rush_beats = tunables.get("rushBeats")
-        self.change_s = grid[b0]
-        self.start_s = grid[b0 - self.countdown_beats]
-        self.end_s = grid[b0 + window_beats]
-        self.beat_s = (self.end_s - self.change_s) / window_beats
-        self.outcome: str | None = None  # tag | early | none
-        self.press_s: float | None = None
-        self.fire_s: float | None = None  # tag: when the blackout lands
-        self.arrival_s: float | None = None  # early: when the fall starts
-        self._fall_from = 0
-        self.seen = False  # a frame of it was shown (a seek can jump over a window)
-        self.logged = False
-
-    def frame(self, t: float) -> Frame | None:
-        if self.outcome == "early":
-            if self.arrival_s <= t < self.arrival_s + tunables.get("flareBars") * BEATS_PER_BAR * self.beat_s:
-                fall = Pole(pct=self._fall_from, color=COLOR, mode="drain", ms=tunables.get("earlyFallMs"))
-                return Frame("early", self._beat(self.arrival_s), self.pole, {self.pole: fall},
-                             Perimeter(look="halo", color=COLOR, side="both"))
-            return None
-        if self.outcome == "tag" and t >= self.fire_s:
-            k = self._beat(self.fire_s)
-            if t < self.fire_s + self.beat_s / 2:
-                return Frame("tag", k, self.pole, {}, Perimeter(look="blackout"))
-            if t < max(self.end_s, self.fire_s + self.beat_s):
-                return Frame("new_look", k, self.pole, {}, Perimeter(look="new_look", color=COLOR, side="both"))
-            return None
-        if not self.start_s <= t < self.end_s:
-            return None
-        k = self._beat(t)
-        if k >= 0:
-            pct = 100 - k * 100 / self.window_beats
-            return Frame("open" if k == 0 else "window", k, self.pole, {self.pole: Pole(pct=round(pct), color=COLOR, mode="solid")})
-        pct = round((k + self.countdown_beats + 1) * 100 / self.countdown_beats)
-        if k < -self.rush_beats:
-            return Frame("build", k, self.pole, {self.pole: Pole(pct=pct, color=COLOR, mode="solid")})
-        # rush: two pulses per beat, `ms` = one pulse
-        return Frame("rush", k, self.pole, {self.pole: Pole(pct=pct, color=COLOR, mode="pulse", ms=round(self.beat_s * 500))})
-
-    def press(self, side: str, press_s: float, arrival_s: float) -> str | None:
-        """A 1-tap on a pole: tag, early, or None when it is not a thunder press."""
-        if self.outcome or side != self.pole or not self.start_s <= press_s <= self.end_s:
-            return None
-        self.press_s = press_s
-        if press_s >= self.change_s - tunables.get("graceMs") / 1000:
-            self.outcome = "tag"
-            self.fire_s = self._beat_from(max(self.change_s, press_s, arrival_s))
-        else:
-            current = self.frame(arrival_s)
-            self._fall_from = current.poles[self.pole].pct if current and self.pole in current.poles else 0
-            self.outcome, self.arrival_s = "early", arrival_s
-        return self.outcome
-
-    def live(self, t: float) -> bool:
-        """Countdown or window running: only the dark pole may applaud."""
-        return self.outcome != "early" and self.start_s <= t <= self.end_s
-
-    def record(self, song_id, bpm) -> dict:
-        offset = None if self.press_s is None else round((self.press_s - self.change_s) * 1000)
-        return {"songId": str(song_id), "section": self.section, "pole": self.pole, "outcome": self.outcome or "none",
-                "pressOffsetMs": offset, "windowBeats": self.window_beats, "bpm": bpm}
-
-    def _beat(self, t: float) -> int:
-        return bisect_right(self._grid, t) - 1 - self._b0
-
-    def _beat_from(self, t: float) -> float:
-        """The first beat at or after t (t itself past the end of the grid)."""
-        i = bisect_left(self._grid, t)
-        return self._grid[i] if i < len(self._grid) else t
-
-
-def boundaries(sections: list[dict], every: int) -> list[int]:
-    """1-based numbers of the sections whose end gets a window: the end of verse 2, then every `every`-th
-    section change after it, skipping a change into the final section."""
-    verses = [n for n, s in enumerate(sections, 1) if s["label"] == "verse"]
-    if len(verses) < 2:
-        return []
-    return list(range(verses[1], len(sections) - 1, every))
-
-
-def _window(m: SongMap, section: int, change: float, pole: str) -> Window:
-    countdown, short, long_ = (tunables.get(k) for k in ("countdownBeats", "windowBeatsShort", "windowBeatsLong"))
-    b = m.beats
-    if b:
-        b0 = min(range(len(b)), key=lambda i: abs(b[i] - change))
-        if b0 + short < len(b):
-            w = short if b[b0 + short] - b[b0] >= tunables.get("minWindowMs") / 1000 else long_
-            if b0 - countdown >= 0 and b0 + w < len(b):
-                return Window(section, pole, b, b0, w)
-    # no beats (or not enough around the change): an even grid from the fallback tunables
-    step_in = tunables.get("fallbackCountdownMs") / 1000 / countdown
-    step_out = tunables.get("fallbackWindowMs") / 1000 / short
-    grid = [change - (countdown - i) * step_in for i in range(countdown)] + [change + j * step_out for j in range(short + 1)]
-    return Window(section, pole, grid, countdown, short)
-
-
-def every_sections() -> int:
-    return tunables.SPEC["thunder"]["everySections"]
+    @property
+    def key(self):
+        return self.info.phase, self.info.performer, self.info.pct
 
 
 class Thunder:
-    """The windows of one song, poles drawn when the song starts."""
+    def __init__(self, now_ms: int, first: str = "L"):
+        self.performer = first
+        self._since = now_ms  # the cooldown's start
+        self._blackout_until = now_ms  # no blackout before the first steal
+        self._ready_at: int | None = None
+        self.steals = 0
 
-    def __init__(self, m: SongMap, rng):
-        self.windows: list[Window] = []
-        for n in boundaries(m.sections, every_sections()):
-            w = _window(m, n, m.sections[n - 1]["end"], rng.choice(["L", "R"]))
-            # the countdown must not run into the previous window (sections shorter than countdown + window)
-            if not self.windows or w.start_s >= self.windows[-1].end_s:
-                self.windows.append(w)
+    @property
+    def rival(self) -> str:
+        return OTHER[self.performer]
 
-    def frame(self, t: float) -> Frame | None:
-        for w in self.windows:
-            if f := w.frame(t):
-                w.seen = True
-                return f
-        return None
+    def pct(self, now_ms: int) -> int:
+        """How far the rising pole is, 0..100 (0 through a steal's blackout)."""
+        start = max(self._since, self._blackout_until)  # the rise starts after the blackout
+        return max(0, min(100, (now_ms - start) * 100 // max(1, tunables.get("cooldownMs"))))
 
-    def press(self, side: str, what: str, press_s: float, arrival_s: float) -> str | None:
-        """tag | early (a tap on the active pole), dark (applause from the dark pole, allowed),
-        blocked (applause from the active pole, ignored), or None: not thunder, today's rules."""
-        if what == "tap":
-            return next((kind for w in self.windows if (kind := w.press(side, press_s, arrival_s))), None)
-        if what == "claps" and (w := next((w for w in self.windows if w.live(arrival_s)), None)):
-            return "blocked" if side == w.pole else "dark"
-        return None
+    def press(self, side: str, now_ms: int) -> tuple[str, dict]:
+        """A 1-tap in thunder: ('steal' | 'early' | 'performer', log fields)."""
+        if side == self.performer:
+            return "performer", {}
+        pct = self.pct(now_ms)
+        if pct < 100 and not tunables.get("stealBeforeFull"):
+            return "early", {"pct": pct}
+        waited = now_ms - self._ready_at if self._ready_at is not None else 0
+        fields = {"from": self.performer, "to": side, "waitedMs": waited}
+        self.performer, self._since, self._ready_at = side, now_ms, None
+        self._blackout_until = now_ms + tunables.get("stealBlackoutMs")
+        self.steals += 1
+        return "steal", fields
 
-    def to_log(self, t: float) -> list[Window]:
-        """Windows whose outcome is known and not logged yet (marks them logged): a tag or early press
-        at once, none once a window that was shown runs out."""
-        done = [w for w in self.windows if not w.logged and (w.outcome or (w.seen and t >= w.end_s))]
-        for w in done:
-            w.logged = True
-        return done
+    def frame(self, now_ms: int) -> Frame:
+        me, rival = self.performer, self.rival
+        if now_ms < self._blackout_until:
+            return Frame({}, Perimeter(look="blackout", color=None, side="both"),
+                         ThunderInfo(phase="steal", performer=me, pct=0))
+        pct = self.pct(now_ms)
+        ready = pct >= 100
+        if ready and self._ready_at is None:
+            self._ready_at = now_ms
+        rising = (Pole(pct=100, color=TURN_COLOR[rival], mode="pulse", ms=round(1000 / tunables.get("flickerHz")))
+                  if ready else Pole(pct=pct, color=TURN_COLOR[rival], mode="solid"))
+        poles = {me: Pole(pct=100, color=TURN_COLOR[me], mode="solid"), rival: rising}
+        info = ThunderInfo(phase="ready" if ready else "cooldown", performer=me, pct=pct)
+        return Frame(poles, Perimeter(look="turn", color=TURN_COLOR[me], side=me), info)

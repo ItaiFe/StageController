@@ -4,7 +4,6 @@ Pure: no player or DB, and time is always an argument. A song without usable sec
 a SongMap (`has_markers` False): every question then answers from the spec's fallback tunables.
 """
 import json
-from bisect import bisect_left, bisect_right
 from pathlib import Path
 
 from . import tunables
@@ -73,11 +72,3 @@ class SongMap:
             return current["turn"]
         return self.turn_owner(t, duration)
 
-    def beat_at(self, t: float) -> int:
-        """Index of the last beat at or before t; -1 before the first."""
-        return bisect_right(self.beats, t) - 1
-
-    def beat_after(self, t: float) -> float | None:
-        """Time of the first beat at or after t."""
-        i = bisect_left(self.beats, t)
-        return self.beats[i] if i < len(self.beats) else None

@@ -2,7 +2,7 @@
 // show events. Pole fill comes from the events (binding); the perimeter, washes and the smoke puff
 // follow the spec's drawings (illustration, spec intro.binding).
 
-import { buttonRings, poleState } from './events';
+import { buttonRings, poleState, pulseLevel } from './events';
 import type { ButtonLights, Rgb, Ring, ShowEvent, ShowSpec } from './events';
 
 export type Side = 'L' | 'R';
@@ -15,8 +15,7 @@ export const SEGMENTS = 24;
 export const OFF: Rgb = [30, 22, 28];
 const MID = 360;
 const TAU = Math.PI * 2;
-// thunder: the perimeter colour after each tag ("new look")
-export const LOOKS = ['pink', 'lime', 'blue'];
+const OWN: Record<Side, string> = { L: 'lime', R: 'blue' };
 
 /** LED positions every `step` px around the T. */
 function perimeter(step: number): [number, number][] {
@@ -48,8 +47,6 @@ export interface StageInput {
   event: ShowEvent | null;
   sinceEventS: number; // since the event arrived
   nowS: number; // free-running clock for the colour drift
-  beatS: number; // one beat of the song playing
-  look: number; // thunder: tags so far (picks the perimeter colour)
   handover?: { buttons: ButtonLights; sinceS: number } | null; // the last change of singer
 }
 
@@ -76,7 +73,7 @@ export function drift(spec: ShowSpec, name: string, i: number, t: number): Rgb {
 const half = (side: string | null | undefined) => (p: [number, number]) =>
   side === 'L' ? p[0] < MID : side === 'R' ? p[0] >= MID : side === 'centre' ? Math.abs(p[0] - MID) <= 115 : true;
 
-export function stageFrame(spec: ShowSpec, { event, sinceEventS, nowS: t, beatS, look, handover }: StageInput): StageFrame {
+export function stageFrame(spec: ShowSpec, { event, sinceEventS, nowS: t, handover }: StageInput): StageFrame {
   const f: StageFrame = { leds: LEDS.map(() => null), wash: {}, poles: { L: null, R: null }, buttons: { L: false, R: false }, puff: null };
   const paint = (name: string, a: number, pick: (p: [number, number]) => boolean = () => true) =>
     LEDS.forEach((p, i) => { if (pick(p)) f.leds[i] = { c: drift(spec, name, i, t), a: clamp(a) }; });
@@ -105,8 +102,9 @@ export function stageFrame(spec: ShowSpec, { event, sinceEventS, nowS: t, beatS,
     return f;
   }
   if (event.state === 'intro') return intro(spec, event, sinceEventS, t, f, paint, poles);
-  if (!event.thunder) f.rings = buttonRings(event.buttons, handover); // a thunder frame drives the active button itself
-  return playing(spec, event, sinceEventS, t, beatS, look, f, paint, poles);
+  if (event.thunder) return thunder(event, sinceEventS, f, paint, poles);
+  f.rings = buttonRings(event.buttons, handover);
+  return playing(event, sinceEventS, f, paint, poles);
 }
 
 type Paint = (name: string, a: number, pick?: (p: [number, number]) => boolean) => void;
@@ -145,11 +143,9 @@ function intro(spec: ShowSpec, e: ShowEvent, since: number, t: number, f: StageF
   return f;
 }
 
-function playing(spec: ShowSpec, e: ShowEvent, since: number, t: number, beatS: number, look: number,
-  f: StageFrame, paint: Paint, poles: (b?: number) => void) {
-  poles(); // the in-song glow (or thunder's fill): each side in its song-map colour for the game
+function playing(e: ShowEvent, since: number, f: StageFrame, paint: Paint, poles: (b?: number) => void) {
+  poles(); // the in-song glow: each side in its song-map colour for the game
   f.buttons = { L: !!f.poles.L, R: !!f.poles.R };
-  const th = e.thunder;
   if (e.game === 'showoff' && e.turn && e.turn !== 'both') {
     // a verse: the singer's side in their colour
     const name = e.turn === 'L' ? 'lime' : 'blue';
@@ -157,50 +153,30 @@ function playing(spec: ShowSpec, e: ShowEvent, since: number, t: number, beatS: 
     f.wash[e.turn] = { name, a: 0.16 };
     return f;
   }
-  if (e.game !== 'thunder') {
-    // together (every section of solo and duet, showoff choruses): the intro's pink settling to 0.28
-    const songT = (e.song?.t ?? 1) + since;
-    paint('pink', lerp(1, 0.28, clamp(songT / 0.7)));
-    f.wash.C = { name: 'pink', a: 0.06 };
-    return f;
-  }
-  const name = LOOKS[look % LOOKS.length];
-  if (!th) { // thunder between windows: the current look, calm
-    paint(name, 0.3);
-    f.wash.C = { name, a: 0.06 };
-    return f;
-  }
-  const tb = th.beat + Math.min(since / beatS, 0.999); // beats from the verse change, with the fraction
-  const fr = (tb * (th.phase === 'rush' ? 2 : 1)) % 1;
-  const centre: [number, number] = [POLE_X[th.pole], 395];
-  if (th.phase === 'tag') return f; // half a beat of blackout
-  LEDS.forEach((p, i) => {
-    let c = drift(spec, name, i, t), a = 0.3;
-    if (th.phase === 'build' || th.phase === 'rush') {
-      // white rings run out of the active pole, once a beat, twice in the rush
-      const d = Math.hypot(p[0] - centre[0], p[1] - centre[1]);
-      const w = Math.pow(0.5 + 0.5 * Math.cos(TAU * (d / 170 + fr)), 3) * (th.phase === 'rush' ? 1 : 0.7);
-      c = mix(c, [255, 255, 255], w);
-      a = 0.18 + 0.82 * w;
-    } else if (th.phase === 'open' || th.phase === 'window') {
-      a = 0.45;
-      const fl = th.phase === 'open' ? 1 - (since / beatS) * 2 : 0; // the open beat flashes white
-      if (fl > 0) { c = mix(c, [255, 255, 255], fl); a = Math.max(a, fl); }
-    } else if (th.phase === 'new_look') {
-      a = lerp(1, 0.32, clamp(since));
-    } else if (th.phase === 'early') {
-      a = 0.75 + 0.25 * Math.cos(TAU * tb); // the halo: the stage glows for the one who stays
-    }
-    f.leds[i] = { c, a };
-  });
-  f.wash.C = { name, a: th.phase === 'early' ? 0.22 : 0.06 };
-  if (th.phase === 'new_look') {
-    const k = clamp(since / 1.5);
-    f.puff = { r: lerp(30, 120, k), a: 0.4 * (1 - k) };
-  }
-  const counting = th.phase === 'build' || th.phase === 'rush';
-  poles(counting ? 0.6 + 0.4 * (1 - fr) : 1);
-  const on = counting ? fr < 0.4 : th.phase === 'open' || th.phase === 'window';
-  f.buttons[th.pole] = on;
+  // together (every section of solo and duet, showoff choruses): the intro's pink settling to 0.28
+  const songT = (e.song?.t ?? 1) + since;
+  paint('pink', lerp(1, 0.28, clamp(songT / 0.7)));
+  f.wash.C = { name: 'pink', a: 0.06 };
+  return f;
+}
+
+/** Thunder's steal loop: the performer's half and pole in their colour, the rival's pole rising in
+ * theirs (it, its half of the edge and its button ring flicker once full: steal now), a blackout on a
+ * steal. The fill % is the event's; the edge drawing is illustration. */
+function thunder(e: ShowEvent, since: number, f: StageFrame, paint: Paint, poles: (b?: number) => void) {
+  const th = e.thunder!;
+  if (th.phase === 'steal') return f; // the blackout
+  const me = th.performer, rival: Side = me === 'L' ? 'R' : 'L';
+  poles();
+  const flick = th.phase === 'ready' ? pulseLevel(since * 1000, e.poles[rival].ms || 500) : 1;
+  paint(OWN[me], 0.5, half(me));
+  paint(OWN[rival], (0.08 + 0.32 * th.pct / 100) * flick, half(rival));
+  f.wash[me] = { name: OWN[me], a: 0.16 };
+  f.buttons = { L: true, R: true };
+  const b = e.buttons;
+  f.rings = {
+    [me]: { name: b?.[me] ?? OWN[me], a: 1 },
+    [rival]: { name: b?.[rival] ?? OWN[rival], a: flick },
+  } as StageFrame['rings'];
   return f;
 }

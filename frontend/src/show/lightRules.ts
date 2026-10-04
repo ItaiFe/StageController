@@ -1,5 +1,5 @@
 // What every light does in each mode, in words, for the emulator's rules panel. Numbers come from the
-// spec's tunables; the rules themselves mirror backend show/events.py, thunder.py and scene.py.
+// spec's tunables; the rules themselves mirror backend show/events.py, thunder.py (the steal loop) and scene.py.
 import type { ShowSpec } from './events';
 
 export type RuleId = 'idle' | 'solo' | 'duet' | 'showoff' | 'thunder' | 'fail' | 'song';
@@ -35,13 +35,12 @@ export function lightRules(spec: ShowSpec): LightRule[] {
     ] },
     { id: 'thunder', title: `Thunder · ${clicks('thunder')}+${clicks('thunder')}`, lines: [
       'Intro: white only. 3 left side, 2 right side, 1 the centre (catwalk).',
-      `Windows: at the end of verse 2, then every ${spec.thunder?.everySections ?? 2} sections to the end of the song (never into the last section). Each window: one pole, picked at random, is active, the other dark.`,
-      `Between windows the poles glow (${tun('ambientGlowPct')} %) for the singer like a duet; after a tag the tagger's colour (left lime, right blue) until the next tag.`,
-      `Build: active pole climbs white over ${tun('countdownBeats')} beats. Rush, last ${tun('rushBeats')} beats: keeps climbing and pulses.`,
-      `Open: 100 % white at the section change, then drains over the window (${tun('windowBeatsShort')} beats, or ${tun('windowBeatsLong')} if that is under ${tun('minWindowMs')} ms).`,
-      '1 tap on the active pole in the window = tag: half-beat blackout on the beat, then a new white look, smoke puff.',
-      `Too early (before the change − ${tun('graceMs')} ms) = the pole falls to 0 in ${tun('earlyFallMs')} ms and a white halo for ${tun('flareBars')} bar; window cancelled.`,
-      'Only the dark pole can clap during a countdown or window.',
+      'A steal loop, by the clock (not the song or its sections). Left performs first: its pole full lime, its half of the edge lime.',
+      `The other pole rises 0 → 100 % in its own colour (right blue, left lime) over ${Number(tun('cooldownMs')) / 1000} s (cooldownMs).`,
+      `At 100 % it flickers (fade up and down, ${tun('flickerHz')} Hz) with its button ring: steal now. No timeout.`,
+      `1 tap from the flickering side = steal: ${tun('stealBlackoutMs')} ms blackout and a smoke puff, the roles swap, the cooldown restarts for the other side.`,
+      `A tap before 100 % is ignored (too early${tun('stealBeforeFull') ? '; stealBeforeFull is on, so it steals' : ''}); a tap on the performer's own pole is ignored.`,
+      'Button rings: each player\'s colour; the rising side\'s ring flickers with its pole. Claps (2 taps) work as in every song.',
     ] },
     { id: 'fail', title: 'Fail · counts differ', lines: [
       `Poles blink white left, right, left, right (${tun('failBlinkCount')} × ${tun('failBlinkMs')} ms), the last one fades over ${tun('failFadeMs')} ms. Edge dark. Back to idle.`,

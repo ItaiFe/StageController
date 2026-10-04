@@ -8,7 +8,7 @@ import type { Pole, ShowEvent } from './events';
 export const IDLE_TAPS: Record<string, number> = { start: 1, claps: 2, special: 3, skip: 4 };
 
 /** The press guide row a meaning belongs to (so the guide can light it up). */
-export type GuideRow = 'idle-1' | 'idle-2' | 'idle-3' | 'idle-4' | 'claps' | 'special' | 'skip' | 'tag' | 'stop' | null;
+export type GuideRow = 'idle-1' | 'idle-2' | 'idle-3' | 'idle-4' | 'claps' | 'special' | 'skip' | 'steal' | 'stop' | null;
 
 export interface PressContext {
   event: ShowEvent | null;
@@ -20,6 +20,24 @@ export interface PressContext {
 
 const SIDE_NAME = { L: 'left', R: 'right' } as const;
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const COLOUR = { L: 'lime', R: 'blue' } as const;
+const OTHER = { L: 'R', R: 'L' } as const;
+type Thunder = NonNullable<ShowEvent['thunder']>;
+
+/** Thunder's steal loop in words: who performs and how far the rival's pole is. */
+export function thunderText(th: Thunder): string {
+  const rival = OTHER[th.performer];
+  if (th.phase === 'steal') return `steal: blackout and smoke, ${SIDE_NAME[th.performer]} (${COLOUR[th.performer]}) takes the stage`;
+  return `${SIDE_NAME[th.performer]} performs (${COLOUR[th.performer]} full), ${SIDE_NAME[rival]} ${COLOUR[rival]} ${th.pct} %${th.phase === 'ready' ? ' flickering = steal now' : ' rising'}`;
+}
+
+/** What 1 tap on `side` does in thunder now. */
+function thunderTap(th: Thunder, side: 'L' | 'R'): string {
+  if (side === th.performer) return `${SIDE_NAME[side]} performs: a tap on the performer's own pole does nothing`;
+  if (th.phase === 'ready') return `${COLOUR[side]} is at 100 % flickering → steal, ${COLOUR[side]} performs, ${COLOUR[th.performer]} starts rising`;
+  if (th.phase === 'steal') return 'a steal is landing: nothing';
+  return `too early, ${COLOUR[side]} is ${th.pct} % filled (steal at 100 %): ignored`;
+}
 
 /** idle / launching / intro <game> / fail blink / playing <game> at <section> <t>s */
 export function stateText(event: ShowEvent | null, songT: number | null): string {
@@ -48,19 +66,8 @@ export function pressMeaning(action: string, side: 'L' | 'R', ctx: PressContext,
   if (state !== 'playing') return { text: `nothing during the ${state === 'failing' ? 'fail blink' : 'intro'}`, row: null };
 
   const th = event?.thunder;
-  const live = th && ['build', 'rush', 'open', 'window'].includes(th.phase);
-  if (action === 'start') {
-    if (live && th.pole === side) {
-      return th.phase === 'build' || th.phase === 'rush'
-        ? { text: 'thunder early: the pole falls, halo for the performer', row: 'tag' }
-        : { text: 'thunder tag: blackout on the beat, new look, smoke', row: 'tag' };
-    }
-    return { text: live ? 'tap on the dark pole: nothing' : 'plain tap: nothing (only thunder tags use it)', row: 'tag' };
-  }
-  if (action === 'claps') {
-    if (live) return th.pole === side ? { text: 'claps from the active pole: not allowed', row: 'claps' } : { text: 'claps from the dark pole → claps sequence', row: 'claps' };
-    return { text: 'claps → claps sound + claps sequence', row: 'claps' };
-  }
+  if (action === 'start') return { text: th ? thunderTap(th, side) : 'plain tap: nothing (only thunder steals use it)', row: 'steal' };
+  if (action === 'claps') return { text: 'claps → claps sound + claps sequence', row: 'claps' };
   if (action === 'special') return { text: 'special → special sequence (smoke / bubbles)', row: 'special' };
   if (action === 'skip') {
     if (songT !== null && skipCutoffS !== null && songT > skipCutoffS) {
@@ -74,14 +81,16 @@ export function pressMeaning(action: string, side: 'L' | 'R', ctx: PressContext,
 const REASONS: Record<string, string> = {
   late_press: 'not part of this launch (one gesture per side, first presses within the sync window)',
   after_cutoff: 'after the mid-verse-2 cutoff',
-  active_pole: 'the active pole may not clap',
   ordinary: 'a plain tap does nothing',
+  too_early: "too early, the pole is not full yet",
+  performer: "the performer's own pole",
   intro: 'the intro is running',
   failing: 'the fail blink is running',
 };
 
-export function answerText(res: { status: string; reason?: string }): string {
-  return res.reason ? `${res.status === 'ignored' ? 'ignored' : res.status}: ${REASONS[res.reason] ?? res.reason}` : res.status;
+export function answerText(res: { status: string; reason?: string; pct?: number }): string {
+  const why = res.reason ? `${REASONS[res.reason] ?? res.reason}${res.pct !== undefined ? ` (${res.pct} % filled)` : ''}` : '';
+  return why ? `${res.status === 'ignored' ? 'ignored' : res.status}: ${why}` : res.status;
 }
 
 export function gestureText(action: string, taps: number | null): string {
@@ -101,7 +110,7 @@ const where = (side: string | null | undefined) => (side === 'L' ? 'left' : side
 /** What a show event tells the stage, in words. */
 export function showLine(e: ShowEvent): string {
   const poles = [pole('L', e.poles.L), pole('R', e.poles.R)].filter(Boolean).join(', ') || 'off';
-  const per = e.perimeter?.look === 'blackout' ? 'blackout' : e.perimeter ? `${e.perimeter.color ?? ''} ${where(e.perimeter.side)}${e.perimeter.look === 'merge' ? ', merging' : ''}${e.perimeter.look === 'halo' ? ', halo' : ''}` : null;
+  const per = e.perimeter?.look === 'blackout' ? 'blackout' : e.perimeter ? `${e.perimeter.color ?? ''} ${where(e.perimeter.side)}${e.perimeter.look === 'merge' ? ', merging' : ''}` : null;
   const tail = `poles ${poles}${per ? ` · perimeter ${per}` : ''}`;
   switch (e.state) {
     case 'idle': return 'idle: poles back to the pillar idle, stage breathing pink';
@@ -110,10 +119,11 @@ export function showLine(e: ShowEvent): string {
     case 'intro': return `${cap(e.game ?? '')} intro ${e.step}: ${tail}`;
   }
   const section = e.song?.section ? `${e.song.section}${e.song.section_index ? ` ${e.song.section_index}` : ''}` : 'song';
-  if (e.thunder) return `thunder ${section} · ${e.thunder.phase} beat ${e.thunder.beat} on the ${SIDE_NAME[e.thunder.pole]} pole: ${tail}`;
+  // the rise sends an event per percent: the feed gets a line each quarter (same text = no new line)
+  if (e.thunder) return `thunder: ${thunderText({ ...e.thunder, pct: e.thunder.phase === 'cooldown' ? Math.floor(e.thunder.pct / 25) * 25 : e.thunder.pct })}`;
   const glow = [pole('L', e.poles.L), pole('R', e.poles.R)].filter(Boolean).join(', ') || 'off';
   if (e.turn && e.turn !== 'both') return `playing ${e.game} · ${section}: ${SIDE_NAME[e.turn]}'s turn (${e.turn === 'L' ? 'lime' : 'blue'} on that side), poles ${glow}`;
-  return `playing ${e.game} · ${section}: ${e.game === 'thunder' ? 'the current look' : 'pink'} all round, poles ${glow}`;
+  return `playing ${e.game} · ${section}: pink all round, poles ${glow}`;
 }
 
 const TURN = { L: "left player's turn (lime)", R: "right player's turn (blue)", both: 'both together (pink)' } as const;
@@ -130,7 +140,8 @@ export function nowText(ctx: PressContext): string {
   }
   const s = e!.song?.section ? `${e!.song.section}${e!.song.section_index ? ` ${e!.song.section_index}` : ''}` : 'no section marks';
   const th = e!.thunder;
-  const extra = e!.turn ? `, ${TURN[e!.turn]}` : th ? `, thunder ${th.phase} on the ${SIDE_NAME[th.pole]} pole, beat ${th.beat}` : '';
+  if (th) return `Playing Thunder — ${thunderText(th)}${t}`;
+  const extra = e!.turn ? `, ${TURN[e!.turn]}` : '';
   return `Playing ${cap(e!.game ?? '')} — ${s}${extra}${t}`;
 }
 
@@ -145,9 +156,9 @@ export function nextText(ctx: PressContext): string {
     ? `4 = skip (ignored now: past ${ctx.skipCutoffS.toFixed(1)} s)` : `4 = skip${ctx.skipCutoffS !== null ? ` (until ${ctx.skipCutoffS.toFixed(1)} s)` : ''}`;
   const base = `2 taps = claps · 3 = special · ${skip} · hold = stop`;
   const th = ctx.event?.thunder;
-  if (th && ['build', 'rush', 'open', 'window'].includes(th.phase)) {
-    const dark = th.pole === 'L' ? 'right' : 'left';
-    return `${SIDE_NAME[th.pole]} (active pole) 1 tap = ${th.phase === 'build' || th.phase === 'rush' ? 'early (pole falls, halo)' : 'tag (blackout, smoke)'} · ${dark} (dark pole) 2 taps = applause · ${base}`;
+  if (th) {
+    const rival = OTHER[th.performer];
+    return `${SIDE_NAME[rival]} 1 tap = ${th.phase === 'ready' ? 'steal' : `nothing yet (${th.pct} %, steal at 100 %)`} · ${SIDE_NAME[th.performer]} 1 tap = nothing (performing) · ${base}`;
   }
   return `1 tap = nothing · ${base}`;
 }

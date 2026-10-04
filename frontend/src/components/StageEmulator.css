@@ -273,24 +273,6 @@
 
 .pole-role.active { color: #fff; font-weight: 600; }
 
-.thunder-status {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.beat-flash {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #fff;
-  animation: beat-flash 0.3s ease-out forwards;
-}
-
-@keyframes beat-flash {
-  to { opacity: 0.15; }
-}
-
 .emulator-now { flex: 1; min-width: 0; margin: 0; padding: 0.3rem 0.75rem; border: 1px solid var(--line, #3A2433); border-radius: 8px; background: rgba(255, 20, 147, 0.08); font-size: 0.85rem; }
 .emulator-legend { display: flex; flex-wrap: wrap; gap: 2px 12px; list-style: none; margin: 0.3rem 0 0; padding: 0; font-size: 0.72rem; color: #B4A8B0; }
 .emulator-legend li { display: flex; align-items: center; gap: 5px; }
@@ -300,7 +282,5 @@
 .emulator-song { display: flex; flex-direction: column; gap: 0.3rem; padding: 0.4rem 0.75rem; border: 1px solid var(--border); border-radius: 12px; background: rgba(51, 34, 40, 0.6); }
 .emulator-song-head { display: flex; gap: 1rem; align-items: baseline; font-size: 0.85rem; }
 .emulator-song-head .time { font-family: ui-monospace, monospace; margin-left: auto; }
-.timeline-thunder { position: absolute; top: 0; bottom: 0; background: repeating-linear-gradient(45deg, rgba(255,255,255,0.55) 0 4px, rgba(255,255,255,0.15) 4px 8px); pointer-events: auto; }
-.timeline-thunder::after { content: ''; position: absolute; top: -5px; bottom: -5px; left: var(--change); border-left: 2px solid #fff; }
 .emulator-song .emulator-macros { gap: 0.3rem; }
 .emulator-song .emulator-macros button { padding: 0.15rem 0.5rem; font-size: 0.78rem; }

@@ -23,13 +23,16 @@ export interface ShowEvent {
   perimeter: { look: string; color: string | null; side: 'L' | 'R' | 'both' | 'centre' | null } | null;
   song: { id: number; section: string | null; section_index: number | null; t: number } | null;
   turn: 'L' | 'R' | 'both' | null;
-  thunder: { phase: string; pole: 'L' | 'R'; beat: number } | null;
+  // thunder's steal loop: who performs, the rising pole's fill (0-100 over cooldownMs), 'ready' = it
+  // flickers at 100 % and a press steals, 'steal' = the short blackout after a steal
+  thunder: { phase: 'cooldown' | 'ready' | 'steal'; performer: 'L' | 'R'; pct: number } | null;
   buttons?: ButtonLights | null; // playing only: the button rings
 }
 
 /** The pillar button rings in song: the singer's colour per side (null = dim); `pulses` > 0 on the
- * event at a change of singer (both pulse together over `pulse_ms`, then settle). */
-export interface ButtonLights { L: string | null; R: string | null; pulses: number; pulse_ms: number }
+ * event at a change of singer (both pulse together over `pulse_ms`, then settle); thunder: `flicker` =
+ * the side whose ring flickers with its full pole (a steal is open). */
+export interface ButtonLights { L: string | null; R: string | null; pulses: number; pulse_ms: number; flicker?: 'L' | 'R' | null }
 
 export type Ring = { name: string; a: number } | null;
 
@@ -51,10 +54,9 @@ export interface ShowSpec {
   palette: Record<string, { ramp: number[][] }>;
   tunables?: { id: string; value: unknown }[];
   games: { id: string; start: { buttons: number; clicks: number } }[];
-  thunder?: { everySections?: number };
 }
 
-// How the emulator draws pulse and blink when the event gives no rate (thunder's rush does: `ms`)
+// How the emulator draws pulse and blink when the event gives no rate (thunder's flicker does: `ms`)
 const PULSE_MS = 500;
 const BLINK_MS = 250;
 
@@ -66,6 +68,9 @@ export function paletteRgb(spec: ShowSpec, name: string | null): Rgb | null {
   return ramp ? (ramp[1] as Rgb) : null;
 }
 
+/** A full fade up and down (ease in/out), one cycle per `periodMs`: thunder's flicker. */
+export const pulseLevel = (elapsedMs: number, periodMs: number) => 0.1 + 0.9 * (0.5 - 0.5 * Math.cos((elapsedMs / periodMs) * 2 * Math.PI));
+
 /** How full and how bright a show event's pole is `elapsedMs` after the event arrived (pct 0 when off). */
 export function poleState(pole: Pole, elapsedMs: number): { pct: number; level: number } {
   if (pole.mode === 'off') return { pct: 0, level: 0 };
@@ -74,7 +79,7 @@ export function poleState(pole: Pole, elapsedMs: number): { pct: number; level: 
   if (pole.mode === 'drain' && pole.ms) pct *= Math.max(0, 1 - elapsedMs / pole.ms);
   if (pole.mode === 'blink') level = Math.floor(elapsedMs / BLINK_MS) % 2 === 0 ? 1 : 0;
   if (pole.mode === 'glow') level = (pole.level ?? 35) / 100;
-  if (pole.mode === 'pulse') level = 0.65 + 0.35 * Math.sin((elapsedMs / (pole.ms || PULSE_MS)) * 2 * Math.PI);
+  if (pole.mode === 'pulse') level = pulseLevel(elapsedMs, pole.ms || PULSE_MS);
   return { pct, level };
 }
 
@@ -110,7 +115,7 @@ export function describeEvent(data: { action: string; [key: string]: unknown }):
   if (e.step !== null) parts.push(`step ${e.step}`);
   if (e.song?.section) parts.push(`${e.song.section} ${e.song.section_index ?? ''}`.trim());
   if (e.turn) parts.push(`turn ${e.turn}`);
-  if (e.thunder) parts.push(`thunder ${e.thunder.phase} ${e.thunder.pole} beat ${e.thunder.beat}`);
+  if (e.thunder) parts.push(`thunder ${e.thunder.phase} · ${e.thunder.performer} performs · ${e.thunder.pct}%`);
   if (e.state !== 'idle') parts.push(`L ${e.poles.L.pct}% R ${e.poles.R.pct}%`);
   return parts.join(' · ');
 }
@@ -121,7 +126,6 @@ export interface ShowCue {
   timestamp: string;
   cue: 'claps';
   side: 'L' | 'R' | null;
-  reason: 'claps' | 'applause';
 }
 
 /** How long the emulator shows a cue's badge. */
@@ -130,6 +134,5 @@ export const CUE_BADGE_MS = 2000;
 /** The badge and the feed line for a cue. */
 export function cueView(c: ShowCue): { badge: string; line: string } {
   const who = c.side ? ` (${c.side === 'L' ? 'left' : 'right'} pillar)` : '';
-  const why = c.reason === 'applause' ? "thunder applause from the dark pole" : '2 taps in the song';
-  return { badge: '👏 CLAPS', line: `claps triggered${who}: ${why} → claps sequence running, applause sound` };
+  return { badge: '👏 CLAPS', line: `claps triggered${who}: 2 taps in the song → claps sequence running, applause sound` };
 }

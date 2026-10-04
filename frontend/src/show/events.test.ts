@@ -43,8 +43,9 @@ describe('polePixels', () => {
 
   it('pulses at the period the event gives', () => {
     const red = (ms: number | null, at: number) => polePixels(pole({ mode: 'pulse', ms }), pink, at)[0];
-    expect(red(290, 290 / 4)).toBe(255); // the top of the pulse a quarter period in
-    expect(red(null, 290 / 4)).not.toBe(255);
+    expect(red(290, 290 / 2)).toBe(255); // a full fade: brightest half a period in
+    expect(red(290, 0)).toBeLessThan(40); // and nearly dark at the start of each cycle
+    expect(red(null, 290 / 2)).not.toBe(255);
   });
 });
 
@@ -65,16 +66,15 @@ describe('describeEvent', () => {
     expect(describeEvent({ action: 'claps' })).toBe('button claps');
     const playing = { action: 'show', state: 'playing', game: 'showoff', step: null, poles: e.poles, turn: 'R', song: { id: 1, section: 'verse', section_index: 2, t: 105 } };
     expect(describeEvent(playing)).toBe('playing · showoff · verse 2 · turn R · L 100% R 100%');
-    const thunder = { ...playing, game: 'thunder', turn: null, thunder: { phase: 'rush', pole: 'L', beat: -3 } };
-    expect(describeEvent(thunder)).toBe('playing · thunder · verse 2 · thunder rush L beat -3 · L 100% R 100%');
+    const thunder = { ...playing, game: 'thunder', turn: null, thunder: { phase: 'cooldown', performer: 'L', pct: 40 } };
+    expect(describeEvent(thunder)).toBe('playing · thunder · verse 2 · thunder cooldown · L performs · 40% · L 100% R 100%');
   });
 });
 
 describe('cueView', () => {
   it('maps a claps cue to the badge and a feed line', () => {
-    const c = { action: 'cue', timestamp: '', cue: 'claps', side: 'R', reason: 'claps' } as const;
+    const c = { action: 'cue', timestamp: '', cue: 'claps', side: 'R' } as const;
     expect(cueView(c)).toEqual({ badge: '👏 CLAPS', line: 'claps triggered (right pillar): 2 taps in the song → claps sequence running, applause sound' });
-    expect(cueView({ ...c, side: 'L', reason: 'applause' }).line).toBe('claps triggered (left pillar): thunder applause from the dark pole → claps sequence running, applause sound');
   });
 });
 

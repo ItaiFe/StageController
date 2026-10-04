@@ -12,7 +12,7 @@ import type { GuideRow, PressContext } from '../show/pressMeaning';
 import { BOTH_OFFSET_MS, playScript, scripts } from '../show/pressScripts';
 import type { Script } from '../show/pressScripts';
 import { SEGMENTS, stageFrame } from '../show/stageLook';
-import { pct, sectionOwner, seekTargets, segments, thunderSeek } from '../show/timeline';
+import { pct, sectionOwner, seekTargets, segments } from '../show/timeline';
 import type { SongMapInfo } from '../show/timeline';
 import LightRules from './LightRules';
 import { StageView } from './StageView';
@@ -55,10 +55,8 @@ function describeLogLine({ type, t: _t, mono: _mono, ...fields }: ShowLogLine): 
 }
 
 /** The song strip: sections coloured by whose turn they are (the colours the real show would use), the
- * skip cutoff, every thunder window (countdown start to window end, the line is the change), the playhead
- * and the time; click to seek, the buttons jump just before the points that change the game. */
+ * skip cutoff, the playhead and the time (thunder has no marks: its steal loop runs by the clock); click to seek, the buttons jump just before the points that change the game. */
 function Timeline({ map, spec, time, duration, section, game }: { map: SongMapInfo; spec: ShowSpec | null; time: number; duration: number; section: string | null; game: string | null | undefined }) {
-  const thunder = thunderSeek(map, time);
   const colour = (name: string) => {
     const rgb = spec ? paletteRgb(spec, name) : null;
     return rgb ? `rgb(${rgb.join(',')})` : undefined;
@@ -91,13 +89,6 @@ function Timeline({ map, spec, time, duration, section, game }: { map: SongMapIn
             </div>
           );
         })}
-        {(map.thunder_windows ?? []).map((w, i) => {
-          const left = pct(w.start_s, duration), width = pct(w.end_s, duration) - left;
-          return (
-            <div key={w.section} className="timeline-thunder" style={{ left: `${left}%`, width: `${width}%`, '--change': `${((w.change_s - w.start_s) / (w.end_s - w.start_s)) * 100}%` } as React.CSSProperties}
-              title={`Thunder window ${i + 1}: countdown ${w.start_s.toFixed(1)} s, change ${w.change_s.toFixed(1)} s (end of section ${w.section}), window ends ${w.end_s.toFixed(1)} s`} />
-          );
-        })}
         <div className="timeline-cutoff" style={{ left: `${cutoff}%` }} title={`Skip cutoff ${map.skip_cutoff_s.toFixed(2)} s`} />
         <div className="timeline-playhead" style={{ left: `${pct(time, duration)}%` }} />
       </div>
@@ -105,7 +96,6 @@ function Timeline({ map, spec, time, duration, section, game }: { map: SongMapIn
         {seekTargets(map, time, SEEK_LEAD_S).map(t => (
           <button key={t.label} type="button" onClick={() => playerApi.seek(t.to)}>{t.label} −{SEEK_LEAD_S} s</button>
         ))}
-        {thunder && <button type="button" onClick={() => playerApi.seek(thunder.to)}>{thunder.label} −10 s</button>}
       </div>
     </>
   );
@@ -141,7 +131,6 @@ export function StageEmulator() {
   const lastShowLine = useRef('');
   const playerRef = useRef(player);
   const songMapRef = useRef(songMap);
-  const lookRef = useRef(0); // thunder: tags so far this song, picks the perimeter look
   const slotsRef = useRef(slots);
   const slotStart = useRef<{ slot: Slot | null; at: number }>({ slot: null, at: 0 });
   const devicesRef = useRef<Device[] | null>(null);
@@ -188,12 +177,7 @@ export function StageEmulator() {
     lastShowLine.current = text;
   }, [show, addFeed]);
 
-  useEffect(() => {
-    const before = showRef.current?.event.thunder?.phase;
-    showRef.current = show;
-    if (!show || show.event.state === 'idle') lookRef.current = 0;
-    else if (show.event.thunder?.phase === 'new_look' && before !== 'new_look') lookRef.current += 1;
-  }, [show]);
+  useEffect(() => { showRef.current = show; }, [show]);
   useEffect(() => { playerRef.current = player; }, [player]);
   useEffect(() => { songMapRef.current = songMap; }, [songMap]);
 
@@ -301,7 +285,6 @@ export function StageEmulator() {
 
   const frame = useCallback(() => {
     const s = showRef.current;
-    const bpm = songMapRef.current?.map.bpm;
     const now = performance.now();
     // no show instruction: the poles play the pillar's own slot sequence, like the real pillar
     const slot = slotWithoutShow(s?.event ?? null, playerRef.current?.current_song != null);
@@ -312,8 +295,6 @@ export function StageEmulator() {
       event: s?.event ?? null,
       sinceEventS: s ? (performance.now() - s.at) / 1000 : 0,
       nowS: performance.now() / 1000,
-      beatS: bpm ? 60 / bpm : 0.5,
-      look: lookRef.current,
       handover: handoverRef.current && { buttons: handoverRef.current.buttons, sinceS: (now - handoverRef.current.at) / 1000 },
     });
     if (strip) f.strips = { L: strip, R: strip };
@@ -391,9 +372,6 @@ export function StageEmulator() {
   const launchButtons: [string, string][] = [
     ['Solo', 'L1'], ['Duet', `both${clicks('duet')}`], ['Showoff', `both${clicks('showoff')}`], ['Thunder', `both${clicks('thunder')}`], ['Fail', 'L2R3'],
   ];
-  const th = show?.event.thunder;
-  const active: Side = th?.pole ?? 'L';
-  const dark: Side = active === 'L' ? 'R' : 'L';
 
   const toggleDevice = async (device: Device) => {
     const updated = await devicesApi.toggle(device.id, !device.is_on);
@@ -406,7 +384,7 @@ export function StageEmulator() {
   // the big pillar buttons match the drawing's rings: the singer's colour, dim when not singing,
   // and both pulse together at a change of singer
   const ringOf = (side: Side) => {
-    if (event?.state !== 'playing' || event.thunder || !event.buttons || !spec) return undefined;
+    if (event?.state !== 'playing' || !event.buttons || !spec) return undefined;
     const c = paletteRgb(spec, buttonRings(event.buttons)[side]?.name ?? null);
     const rgb = c ? `rgb(${c.join(',')})` : '#3a2a35';
     return { borderColor: rgb, boxShadow: c ? `0 0 14px 2px ${rgb}` : 'none', '--ring': c ? rgb : '#fff' } as React.CSSProperties;
@@ -419,7 +397,7 @@ export function StageEmulator() {
 
   const pillar = (side: Side) => (
     <div className={`emulator-pillar pillar-${side}`}>
-      {event?.thunder && <span className={`pole-role ${event.thunder.pole === side ? 'active' : ''}`}>{event.thunder.pole === side ? 'active' : 'dark'}</span>}
+      {event?.thunder && <span className={`pole-role ${event.thunder.performer === side ? 'active' : ''}`}>{event.thunder.performer === side ? 'performing' : event.thunder.phase === 'ready' ? 'steal now!' : `rising ${event.thunder.pct} %`}</span>}
       <button
         type="button"
         className={`emulator-button ${feedback[side].pressed ? 'pressed' : ''}`}
@@ -457,7 +435,7 @@ export function StageEmulator() {
       <section className="emulator-song" aria-label="Song map">
         {songId !== null && songMap?.songId === songId && player ? (
           <Timeline map={songMap.map} spec={spec} game={event?.game} time={player.current_time} duration={player.duration} section={event?.song?.section ? `${event.song.section}${event.song.section_index ? ` ${event.song.section_index}` : ''}` : null} />
-        ) : <p className="emulator-note">Song map: no song playing (or no analysis for it). Launch a game to see sections, turns, the skip cutoff and the thunder windows.</p>}
+        ) : <p className="emulator-note">Song map: no song playing (or no analysis for it). Launch a game to see sections, turns and the skip cutoff.</p>}
       </section>
 
       <section className="emulator-panes">
@@ -491,11 +469,7 @@ export function StageEmulator() {
             <dt>Time</dt><dd>{player?.current_song ? `${player.current_time.toFixed(1)} / ${player.duration.toFixed(1)} s` : '—'}</dd>
             <dt>Section</dt><dd>{event?.song?.section ?? '—'}</dd>
             <dt>Thunder</dt>
-            <dd className="thunder-status">
-              {/* a new key per event restarts the flash: one flash per beat during countdown and window */}
-              {event?.thunder && <span key={show?.at} className="beat-flash" />}
-              {event?.thunder ? `${event.thunder.phase} · ${event.thunder.pole} · beat ${event.thunder.beat}` : '—'}
-            </dd>
+            <dd>{event?.thunder ? `${event.thunder.phase} · ${event.thunder.performer} performs · ${event.thunder.pct} %` : '—'}</dd>
           </dl>
           <div>
             <h3>Appliances</h3>
@@ -539,14 +513,12 @@ export function StageEmulator() {
             {scriptButton(`${side}hold`)}
           </div>
         ))}
-        <h3 title={`While a song plays. Thunder buttons use the current active / dark pole.`}>In-song</h3>
+        <h3 title={`While a song plays. In thunder, 1 tap on the flickering side steals.`}>In-song</h3>
         <div className="emulator-macros">
           {scriptButton('L2', 'Claps = L×2')}
           {scriptButton('L3', 'Special = L×3')}
           {scriptButton('L4', 'Skip = L×4')}
           {scriptButton('Lhold', 'Stop = L hold')}
-          {scriptButton(`${active}1`, `Tag/early = ${active}×1 (active)`)}
-          {scriptButton(`${dark}2`, `Applause = ${dark}×2 (dark)`)}
         </div>
         <details className="press-guide-box">
           <summary title="Every gesture and what it does; the row of your last press lights up">Press guide</summary>
@@ -560,10 +532,10 @@ export function StageEmulator() {
           <span className={lit(`idle-${clicks('thunder')}`)}>both {clicks('thunder')}+{clicks('thunder')} · thunder</span>
           <span className={lit('idle-4')}>counts differ or 4+ · fail blink</span>
           <strong>In song</strong>
-          <span className={lit('claps')}>2 taps · claps (thunder: dark pole)</span>
+          <span className={lit('claps')}>2 taps · claps</span>
           <span className={lit('special')}>3 taps · special</span>
           <span className={lit('skip')}>4 taps · skip (until mid verse 2)</span>
-          <span className={lit('tag')}>1 tap · thunder tag (active pole)</span>
+          <span className={lit('steal')}>1 tap · thunder steal (flickering side)</span>
           <span className={lit('stop')}>hold · stop</span>
           </div>
         </details>

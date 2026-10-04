@@ -35,11 +35,11 @@ describe('stageFrame', () => {
     expect(f.wash.C?.name).toBe('pink');
   });
 
-  it('in song the poles glow full height at the event level, the button lit; the side not singing is off', () => {
+  it('in song the poles glow full height at the event level, the button lit; the side not singing is drawn dim (14 %), its button off', () => {
     const glow: Pole = { pct: 100, color: 'lime', mode: 'glow', ms: null, level: 35 };
     const f = frame(ev({ state: 'playing', game: 'duet', poles: { L: glow, R: off } } as Partial<ShowEvent>));
-    expect(f.poles.L).toMatchObject({ pct: 100, name: 'lime', a: 0.35 });
-    expect(f.poles.R).toBeNull();
+    expect(f.poles.L).toMatchObject({ pct: 100, name: 'lime', a: 0.35, sing: true });
+    expect(f.poles.R).toEqual({ pct: 100, name: 'blue', a: 0.14, dim: true });
     expect(f.buttons).toEqual({ L: true, R: false });
   });
 

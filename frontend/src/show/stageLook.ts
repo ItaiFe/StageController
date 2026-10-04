@@ -32,7 +32,7 @@ function perimeter(step: number): [number, number][] {
 }
 export const LEDS = perimeter(15);
 
-export interface Lit { name: string; a: number }
+export interface Lit { name: string; a: number; dim?: true; sing?: true } // dim = a resting pole (drawing only), sing = an in-song glow
 export interface StageFrame {
   leds: ({ c: Rgb; a: number } | null)[];
   wash: Partial<Record<Wash, Lit>>;
@@ -146,6 +146,11 @@ function intro(spec: ShowSpec, e: ShowEvent, since: number, t: number, f: StageF
 function playing(e: ShowEvent, since: number, f: StageFrame, paint: Paint, poles: (b?: number) => void) {
   poles(); // the in-song glow: each side in its song-map colour for the game
   f.buttons = { L: !!f.poles.L, R: !!f.poles.R };
+  // the side not singing: every segment at 14 % of its own colour, so it reads as "resting", not broken
+  for (const s of ['L', 'R'] as Side[]) {
+    const p = f.poles[s];
+    f.poles[s] = p ? { ...p, sing: true } : { pct: 100, name: OWN[s], a: 0.14, dim: true };
+  }
   if (e.game === 'showoff' && e.turn && e.turn !== 'both') {
     // a verse: the singer's side in their colour
     const name = e.turn === 'L' ? 'lime' : 'blue';

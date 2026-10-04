@@ -8,7 +8,7 @@ records *how* StageController implements it and the decisions taken while planni
 
 1. Four games launched from the two pillars — solo (1), duet (1+1), showoff (2+2),
    thunder (3+3) — with the 3-2-1 intro, the fail blink, the in-song controls, showoff turns
-   and thunder windows.
+   and the thunder steal loop.
 2. An emulator: run the real backend (real mpv, real song) on a laptop with no hardware and
    watch every mode on a virtual stage in the web UI.
 
@@ -52,27 +52,19 @@ IDLE --gesture(side)--> LAUNCHING --decide--> INTRO(game, 3 steps x introStepMs)
   `on_song_end` → IDLE (no auto-next). In-song gestures go through the D3 table:
   - skip: allowed until the middle of verse 2 (`skipFallbackMs` without sidecar); a skip after
     the cutoff is ignored (`press kind=ordinary`). Next song comes from the same game queue.
-  - claps / special: existing handlers. Thunder exception: during a countdown/window only the
-    **dark** pole's claps count.
+  - claps / special: existing handlers, in every game (thunder included).
   - stop: existing handler (one long press, any side).
 - **Showoff turns**: verse k (1-based) belongs to L if k odd else R; choruses and every
   non-verse section → both; the **last** section → both. Without sidecar: alternate L/R every
   `fallbackTurnMs`, both for the final `fallbackTurnMs`.
-- **Thunder** (spec `thunder`): windows at the section change that ends verse 2, then at
-  every `thunder.everySections`-th (2) section change after it, never at the change into the
-  final section; a window whose countdown would start before the previous window ends is
-  dropped. `verseChange` below = that section change. Random pole (injected RNG); the other is dark. Beats from the sidecar (`fallbackCountdownMs`/
-  `fallbackWindowMs` without beats). Phases relative to the beat index b0 nearest
-  `verseChange`: build `[-countdownBeats, -rushBeats-1]` (+100/countdownBeats % per beat),
-  rush `[-rushBeats, -1]` (keeps climbing, pulses double rate), open at 0 (100 % white),
-  window `0..W` draining 100/W % per beat, `W = windowBeatsShort` if that spans ≥
-  `minWindowMs` else `windowBeatsLong`. A 1-tap (`start`) from the **active** pole:
-  in `[verseChange − graceMs, windowEnd]` → **tag**, fired at the first beat ≥
-  max(verseChange, press time, arrival time): half-beat blackout + new look + smoke; after
-  countdown start and before `verseChange − graceMs` → **early**: pole falls to 0 over
-  `earlyFallMs`, window cancelled, halo for `flareBars` (4 beats per bar); no press → none.
-  Each window logs `window{section,pole,outcome,pressOffsetMs,windowBeats,bpm}` (`section` =
-  the 1-based index of the section that ends).
+- **Thunder** (user rule 2026-10-03, see Deviations; `thunder.py`): a steal loop by the clock,
+  independent of the song and its sections. Left performs first: its pole full in lime; the
+  rival's pole rises 0 → 100 % in blue over `cooldownMs` (20 s); at 100 % it flickers
+  (`flickerHz` 2) until the rival presses, with no timeout. That 1-tap is a steal: the roles
+  swap, `stealBlackoutMs` (300) blackout + smoke puff, and the cooldown restarts for the side
+  that lost the stage. A press before 100 % is ignored (`too_early`; `stealBeforeFull` makes it a
+  steal), a press on the performer's pole is ignored (`performer`). Each steal logs
+  `steal{songId,from,to,waitedMs}`.
 
 ## Show events (WS)
 
@@ -86,7 +78,7 @@ client that joins late is correct after one message:
            "R": {"pct": 66, "color": "blue", "mode": "solid"}},
  "perimeter": {"look": "intro", "color": "blue", "side": "R"},
  "song": {"id": 1, "section": "verse", "section_index": 2, "t": 112.4},
- "thunder": {"phase": "rush", "pole": "L", "beat": -3}}
+ "thunder": null}
 ```
 
 `mode`: `glow | solid | pulse | blink | drain | off` (`glow` carries `level`). Claps also send a
@@ -102,7 +94,7 @@ resolved through `spec.json` palette ramps. Full list in `docs/show-events-contr
   `GestureDetector` that POSTs exactly what a pillar would (`action`, `side`,
   `first_press_ago_ms`); keyboard keys (`A` = left, `L` = right) so both can be pressed at once;
   one-click macros (solo L, duet, showoff, thunder, fail 2-vs-3); live status (state, game,
-  section, song time, beat flash, thunder phase); appliance on/off from the devices API;
+  section, song time, thunder phase and fill); appliance on/off from the devices API;
   event log; seek buttons (jump to 5 s before verse 2 end / before next section) using the
   existing `/api/player/seek`.
 - Idle / plain-song poles fall back to the pillar's slot sequences rendered with the existing
@@ -118,8 +110,7 @@ resolved through `spec.json` palette ramps. Full list in `docs/show-events-contr
   presser's own pole, button feedback) and the logged side differ.
 - **In-song pole glow** (overrides "poles 0 % after the intro"): full height at `ambientGlowPct`
   (35 %) as `mode: "glow"`, so binding fills stay distinct; colour by section owner — duet the
-  singer, showoff the turn, thunder the singer until a tag then the tagger; the side not owning
-  the section is off.
+  singer, showoff the turn; the side not owning the section is off. (Thunder has its own poles.)
 - **Duet singer**: the sidecars have no singer field, so a section may carry an optional
   hand-tagged `turn` (`L`/`R`/`both`); untagged songs fall back to the showoff alternation; the
   final section is always both.
@@ -127,8 +118,12 @@ resolved through `spec.json` palette ramps. Full list in `docs/show-events-contr
   (lime / blue / pink, dim when not singing); at each change of singer both buttons pulse together
   (`handoverPulses` 3 over `handoverPulseMs` 1000, ease in/out), then settle. In the show event
   (`buttons`), so the real pillar LEDs do it too.
-- **Thunder cadence**: windows every `everySections` section changes from the end of verse 2
-  (was: the end of every verse 2..N−1).
+- **Thunder is a time-based steal loop** (overrides the spec's whole `thunder` section: the
+  beat-based countdown, rush, open/window, tag, early/halo and dark-pole applause are gone, and so
+  are their tunables). Performer full in their colour, the rival rising over `cooldownMs` (20 s),
+  flickering at 100 % until they press = steal, roles swap, the cooldown restarts. The intro (white
+  L, R, centre) is unchanged. Claps work as in every song. New tunables `cooldownMs`, `flickerHz`,
+  `stealBlackoutMs`, `stealBeforeFull` (added by Tom, 2026-10-03).
 
 ## Out of scope
 

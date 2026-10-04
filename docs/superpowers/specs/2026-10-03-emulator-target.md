@@ -25,11 +25,11 @@ explained in words, together with what the controller sent in reply.
 | Launching | presser's pole fills to 33 / 66 / 100 % per click | reference launch feedback |
 | Intro solo / duet / showoff / thunder | 100 → 66 → 33 % per step, per-game colours | reference `introFrame` per game: solo and duet pink on both sides (solo is symmetric: L or R gives the same intro), showoff L lime → R blue → merge to pink, thunder white L → R → centre |
 | Fail 2v3 | alternate L, R, L, R white blinks, then the last one fades | no perimeter (reference `introFrame('fail')`) |
-| Playing — per section | glow, full height at `ambientGlowPct` (35 %), in the section owner's colour: solo both pink; duet the singer (L lime / R blue / both pink); showoff the turn; thunder the singer, then the tagger after a tag; the side not owning the section off | reference drift after the intro; colour per section: pink, and in showoff the turn colour (verse 1 L lime, verse 2 R blue, verse 3 L lime; non-verse and the last section pink, both sides) |
+| Playing — per section | glow, full height at `ambientGlowPct` (35 %), in the section owner's colour: solo both pink; duet the singer (L lime / R blue / both pink); showoff the turn; the side not owning the section off | reference drift after the intro; colour per section: pink, and in showoff the turn colour (verse 1 L lime, verse 2 R blue, verse 3 L lime; non-verse and the last section pink, both sides) |
 | Change of singer | both button rings (drawing and the big pillar buttons) pulse together 3× over ~1 s, ease in/out, then show the new singer's colour (lime / blue / pink, dim when not singing) | — |
-| Thunder countdown / window | windows at the end of verse 2, then every `thunder.everySections` (2) section changes, never into the final section, overlapping windows dropped; active pole: build −8…−5 stepwise, rush −4…−1 pulsing at double rate, open 100 % at beat 0, window drains over W beats; dark pole off | reference `thFrame`: white climb, rush, open, drain |
-| Thunder tag / early | tag: half-beat blackout on the beat, then the new look (+ smoke appliance on); early: pole falls over 500 ms + halo for flareBars | as in `thFrame` |
-| Appliances | — | whatever the controller actually switches (start/claps/special sequences, smoke on a tag), lit on the drawing |
+| Thunder steal loop | performer's pole 100 % in their colour (L lime first); the rival's pole rises 0 → 100 % in its colour over `cooldownMs` (20 s), then flickers (`flickerHz` 2) until the rival presses; no timeout | the performer's half of the edge in their colour, the rival's half rising dimly and flickering with its pole; both button rings in the players' colours, the rival's flickering at 100 % |
+| Thunder steal / ignored presses | steal (rival 1 tap at 100 %): `stealBlackoutMs` blackout, roles swap, cooldown restarts (+ smoke); too early or the performer's own pole: ignored, said in the feed with the fill % | blackout, then the new performer's colours |
+| Appliances | — | whatever the controller actually switches (start/claps/special sequences, smoke on a steal), lit on the drawing |
 
 The spec leaves the in-song appliance scene to a later design session. First rule, decided by Tom
 on 2026-10-03: **floodlights on during choruses, spotlights on during verses**, off in every other
@@ -46,7 +46,7 @@ A timestamped feed, newest first, one line per press plus what the controller di
 - what came in: side, gesture (N taps / hold), the state at that moment (idle / intro / playing
   <game> at <section> <t>s);
 - what it means under the current map (idle: launch count; in song: claps / special / skip / stop /
-  thunder tag / early / dark-pole applause), and the backend's answer (ok / ignored + reason in
+  thunder steal / too early / performer's own pole), and the backend's answer (ok / ignored + reason in
   words, e.g. "skip ignored: after the mid-verse-2 cutoff");
 - what the controller pushed in reply: show looks (pole % / colour / mode), appliance on/off by name,
   player play / skip / stop.
@@ -67,8 +67,9 @@ Example: `14:46:53  Right pressed 3× while idle → waiting 500 ms for the left
 ## 5. Acceptance (checked in the browser on the real backend, STAGE_IO=emulated, real mpv)
 
 1. Solo, duet, showoff, thunder each launch, play the real song with the right intro, and show the
-   per-section look through the song (showoff turns at 66.04 / 104.77 / 194.49 s; thunder windows at
-   126.67 / 142.97 / 180.51 / 215.53 s with build / rush / open / window; tag and early visibly different).
+   per-section look through the song (showoff turns at 66.04 / 104.77 / 194.49 s); thunder runs its
+   steal loop by the clock (rise over `cooldownMs`, flicker at 100 %, a steal swaps the roles; a too-early
+   press is ignored and says so).
 2. Fail 2v3 blinks and goes back to idle; skip works before 115.72 s and is ignored after (said on
    screen); hold stops; the song ending returns to idle.
 3. No unexpected song change with hands off for 60 s in every mode.

@@ -45,7 +45,7 @@ perimeter instruction.
 - `mode`: `glow` (the in-song ambient light: full height, dimmed to `level`, so it never reads as a
   binding fill) | `solid` (hold at `pct`) | `pulse` (at `pct`; `ms` = one pulse when set, else your own rate) |
   `blink` | `drain` (fall from `pct` to 0 over `ms`) | `off`.
-- `perimeter.side`: `L | R | both | centre`; `look`: `intro | merge | turn | blackout | new_look | halo`.
+- `perimeter.side`: `L | R | both | centre`; `look`: `intro | merge | turn | blackout`.
 
 ## 3. States
 
@@ -54,7 +54,7 @@ perimeter instruction.
 | `idle` | nothing running (also after a song, a stop or a failed launch) | all `off`. **Fall back to your own slot sequences** (idle rainbow, start comet, ...) exactly as without a show. |
 | `launching` | after each launch gesture, until the decision | the presser's pole at `launchPcts[count-1]` (33/66/100), pink, solid; the other pole as it was |
 | `intro` | the 3-2-1, `step` 3 then 2 then 1, one event per `introStepMs` | `polePcts` (100/66/33) in the game's colours, see below |
-| `playing` | the song started, and again whenever the song's section, the showoff turn or the pole owner changes | the in-song glow (below), or thunder's frame poles during a window; `song` set (see below) |
+| `playing` | the song started, and again whenever the song's section, the showoff turn or the pole owner changes | the in-song glow (below), or in thunder the steal loop's poles (below); `song` set (see below) |
 | `failing` | mismatched launch: `failBlinkCount` events alternating L, R, L, R each `failBlinkMs` (white, solid), then one `drain` event (`ms` = `failFadeMs`) on the last lit pole, then `idle` | one white pole at a time |
 
 `game`: `solo | duet | showoff | thunder` (absent while launching/failing/idle).
@@ -80,7 +80,7 @@ last section is `both` -- with `perimeter = {look: "turn", color: lime | blue | 
 Other games send `turn: null`.
 
 In-song pole glow (a deviation from the spec's 0 % after the intro, asked for by the user): every
-`playing` event without a thunder frame carries the poles as `mode: "glow"`, `pct: 100`,
+`playing` event of solo, duet and showoff carries the poles as `mode: "glow"`, `pct: 100`,
 `level: ambientGlowPct`, in the colour of whoever owns the section, the side not owning it `off`:
 
 | game | owner | poles |
@@ -88,11 +88,10 @@ In-song pole glow (a deviation from the spec's 0 % after the intro, asked for by
 | solo | nobody (no turns) | both pink |
 | duet | the singer: sidecar section `turn` (`L`/`R`/`both`, optional, hand-tagged), else the showoff alternation; the final section is always `both` | L = left lime, R = right blue, both = both pink |
 | showoff | `turn` | as duet |
-| thunder | the singer until a tag, then the performer who tagged | as duet |
 
 `playing` events also carry `buttons` -- the pillar button rings -- `{L, R, pulses, pulse_ms}`:
 `L`/`R` the singer's colour per side as above (`null` = dim, the side not singing). At a change of
-singer (the owner above changes: duet/showoff L -> both -> R ..., thunder after a tag) that one
+singer (the owner above changes: duet/showoff L -> both -> R ...) that one
 event has `pulses = handoverPulses` (3) and `pulse_ms = handoverPulseMs` (1000): both buttons
 pulse **together**, easing in and out, that many times over `pulse_ms`, then settle on the new
 colours. Every other event has `pulses = 0`; it does not cut a running pulse short. The first
@@ -108,50 +107,46 @@ show-event field: the switching shows up in the devices API (`is_on`) like any o
 
 ### Cue (claps)
 
-When the controller runs the claps sequence (2 taps in song, or the dark pole's applause in a
-thunder window) it first sends `{"action":"cue","timestamp":..,"cue":"claps","side":"L"|"R"|null,
-"reason":"claps"|"applause"}`. A cue is one-shot (a client may show a badge or play a sound);
+When the controller runs the claps sequence (2 taps in song, any game, either side) it first sends
+`{"action":"cue","timestamp":..,"cue":"claps","side":"L"|"R"|null}`. A cue is one-shot (a client may show a badge or play a sound);
 it carries no light state and is not replayed to late joiners. Emulator only: the browser plays
 `frontend/public/sounds/claps.mp3`; the Pi never plays it.
 
-### Thunder
+### Thunder: the steal loop
 
-Windows (`thunder.everySections` in the spec, 2 by default): the first at the section change that
-ends verse 2, then one at every `everySections`-th section change after it, never at the change
-into the final section; a window whose countdown would start before the previous window ends is
-dropped. At each window a thunder game sends one `playing` event **per beat** with
-`thunder = {phase, pole, beat}`: `pole` is the active pole (random per window), `beat` counts from
-beat 0, the beat nearest the section change. The active pole is white, the other pole is `off`.
+User rule, 2026-10-03; it replaces the spec's beat-based countdown and windows (spec.json
+`thunder`). Thunder runs by the clock, independent of the song and its sections; the sidecar is not
+used. Left performs first; the state restarts with left on every song (and after a skip).
 
-| `phase` | beats | active pole |
+- The **performer**'s pole: 100 %, `solid`, the performer's colour (L lime, R blue).
+- The **rival**'s pole rises 0 -> 100 % in the rival's colour over `cooldownMs` (20 s by default,
+  the single source is spec.json), `solid`.
+- At 100 % the rival's pole switches to `pulse` with `ms = 1000 / flickerHz` (500 ms at 2 Hz): a
+  full fade up and down. A steal is open, with no timeout.
+- `perimeter = {look: "turn", color: <performer colour>, side: <performer>}`.
+
+Every `playing` event in thunder carries `thunder = {phase, performer, pct}`:
+
+| `phase` | when | poles |
 |---|---|---|
-| `build` | `-countdownBeats .. -rushBeats-1` | `solid`, `pct` steps up 100/countdownBeats per beat (12/25/38/50 at 8 beats) |
-| `rush` | `-rushBeats .. -1` | `pulse` with `ms` = half a beat (two pulses per beat), `pct` keeps climbing to 100 |
-| `open` | `0` | 100, `solid` |
-| `window` | `1 .. W-1` | `solid`, draining 100/W per beat (75/50/25 at W = 4); at beat W the window is over |
-| `tag` | the beat the tag fires on | both `off`, `perimeter.look = "blackout"`, for half a beat |
-| `new_look` | after the blackout | both `off`, `perimeter.look = "new_look"` (scene placeholder) |
-| `early` | from the early press, for `flareBars` bars | the active pole `drain` from where it was over `earlyFallMs`, `perimeter.look = "halo"` |
+| `cooldown` | the rival's pole is rising; one event per whole percent | performer 100 solid, rival `pct` solid |
+| `ready` | the rival's pole is full, until they press | performer 100 solid, rival 100 `pulse` |
+| `steal` | `stealBlackoutMs` (300) after a steal; `performer` is already the new one | both `off`, `perimeter.look = "blackout"` |
 
-After the window (or the halo, or the new look) the next event has `thunder: null` (rest).
-`W` = `windowBeatsShort`, or `windowBeatsLong` when the short one would last less than
-`minWindowMs`. A song without beats uses an even grid: `countdownBeats` steps over
-`fallbackCountdownMs`, `windowBeatsShort` steps over `fallbackWindowMs`.
+`buttons` in thunder: `L`/`R` = each player's colour, `flicker` = the side whose ring flickers
+with its pole (`ready` only, else `null`); `pulses` stays 0 (no handover pulse on a steal: it has
+its own blackout and smoke).
 
-Presses during a window (side-aware POSTs):
+Presses in thunder (side-aware POSTs):
 
-- `start` (1 tap) on the **active** pole, pressed in `[change - graceMs, window end]` = **tag**:
-  fires at the first beat at or after the change, the press and the *arrival* of the POST. A pillar
-  reports a gesture only after it has decided the tap count (~400 ms after the release), so a tag
-  pressed on the change usually fires one beat later; that is by design, the blackout cannot land
-  before the controller knows about it. The press time is `arrival - first_press_ago_ms`, so send
-  an honest `first_press_ago_ms`. The smoke puff (the `special` device sequence) runs on the
-  blackout.
-- `start` on the active pole after the countdown started but before `change - graceMs` = **early**:
-  the `early` event goes out at once, the countdown and window are cancelled.
-- `claps` during the countdown/window: only the **dark** pole's applause counts; the active
-  pole's answers `{"status":"ignored","reason":"active_pole"}`.
-- Anything else keeps today's meaning.
+- `start` (1 tap) from the rival while `ready` = **steal**: the roles swap, the `steal` blackout
+  goes out at once, the smoke puff (the `special` device sequence) runs in the background, then
+  the cooldown restarts from 0 for the side that lost the stage. Logged as `press kind=steal` and
+  `steal {songId, from, to, waitedMs}` (`waitedMs` = time from 100 % to the press).
+- `start` from the rival before 100 % is ignored: `{"status":"ignored","reason":"too_early","pct":..}`
+  (`stealBeforeFull = true` turns it into a steal). Logged as `press kind=early`.
+- `start` on the performer's own pole is ignored: `{"status":"ignored","reason":"performer"}`.
+- `claps`, `special`, `skip`, `stop`: as in every song.
 
 Skip in song is accepted until the middle of verse 2 (`skipFallbackMs` without markers); later
 skips answer `{"status":"ignored","reason":"after_cutoff"}`.

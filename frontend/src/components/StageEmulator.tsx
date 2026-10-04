@@ -1,14 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { buttonsApi, devicesApi, pillarApi, playerApi, showApi } from '../api';
 import type { Device, PlayerState, ShowLogLine } from '../api';
 import { GestureDetector, gestureAction } from '../buttonGesture';
 import { useShowEvents } from '../hooks/useShowEvents';
 import { renderSequence } from '../pillar/sequence';
 import type { Sequence, Slot } from '../pillar/types';
-import { buttonRings, CUE_BADGE_MS, cueView, paletteRgb, slotWithoutShow } from '../show/events';
-import type { Rgb, ShowSpec } from '../show/events';
-import { answerText, gestureText, nextText, nowText, pressLine, pressMeaning, showLine } from '../show/pressMeaning';
-import type { GuideRow, PressContext } from '../show/pressMeaning';
+import { CUE_BADGE_MS, cueView, paletteRgb, slotWithoutShow } from '../show/events';
+import type { Rgb, ShowEvent, ShowSpec } from '../show/events';
+import { answerText, buttonState, gestureText, nextTextFor, nowText, poleRole, pressLine, pressMeaning, showLine, stateText, whyText } from '../show/pressMeaning';
+import type { PressContext } from '../show/pressMeaning';
 import { BOTH_OFFSET_MS, playScript, scripts } from '../show/pressScripts';
 import type { Script } from '../show/pressScripts';
 import { SEGMENTS, stageFrame } from '../show/stageLook';
@@ -23,15 +23,15 @@ const SIDES: Side[] = ['L', 'R'];
 const KEYS: Record<string, Side> = { ArrowLeft: 'L', ArrowRight: 'R' };
 const KEY_LABEL: Record<Side, string> = { L: '←', R: '→' };
 const FEED_SIZE = 60;
-const GUIDE_LIT_MS = 1500;
-const LEGEND: [string, string][] = [['pink', 'together'], ['lime', 'left player'], ['blue', 'right player'], ['white', 'thunder / fail blink']];
 const GESTURE_TICK_MS = 20;
 const SLOT_SEED = 1;
 const JUMP_S = 2; // a song time change this far from the clock is a seek, skip or restart
 
 type FeedKind = 'press' | 'show' | 'device' | 'player' | 'cue';
 const CLAPS_SOUND_S = 3; // the clip is 6 s: fade out after this
-interface FeedLine { id: number; time: Date; kind: FeedKind; text: string; row?: GuideRow }
+// line 1 = what came in, `reply` = line 2, what the controller did (ignored = amber)
+interface FeedLine { id: number; time: Date; kind: FeedKind; text: string; reply?: string; ignored?: boolean; side?: Side }
+type FeedExtra = Pick<FeedLine, 'reply' | 'ignored' | 'side'>;
 
 /** The pillar's 100-pixel strip sampled onto the drawing's 24 pole segments, bottom first. */
 function stripSegments(strip: Uint8Array): Rgb[] {
@@ -47,30 +47,36 @@ const LOG_POLL_MS = 2000;
 const SEEK_LEAD_S = 5;
 // the lower panes share one fixed-height box, one at a time, so the whole tab fits one screen
 type Pane = 'feed' | 'rules' | 'log' | 'status';
-const PANES: [Pane, string][] = [['feed', 'Controller feed'], ['rules', 'Light rules'], ['log', 'Night log'], ['status', 'Status & appliances']];
+const PANES: [Pane, string][] = [['feed', 'Feed'], ['rules', 'Light rules'], ['log', 'Night log'], ['status', 'Status & devices']];
+const fmt = (t: number) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, '0')}`;
 
 function describeLogLine({ type, t: _t, mono: _mono, ...fields }: ShowLogLine): string {
   const rest = Object.entries(fields).map(([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`);
   return [type, ...rest].join(' ');
 }
 
-/** The song strip: sections coloured by whose turn they are (the colours the real show would use), the
- * skip cutoff, the playhead and the time (thunder has no marks: its steal loop runs by the clock); click to seek, the buttons jump just before the points that change the game. */
-function Timeline({ map, spec, time, duration, section, game }: { map: SongMapInfo; spec: ShowSpec | null; time: number; duration: number; section: string | null; game: string | null | undefined }) {
+/** The song strip: sections coloured by whose turn they are (the colours the real show would use; past
+ * faded, the current one outlined), the skip cutoff, the playhead and the time (thunder has no marks: its
+ * steal loop runs by the clock); click to seek, the buttons jump just before the points that change the game. */
+function Timeline({ map, spec, title, time, duration, section, game }: { map: SongMapInfo; spec: ShowSpec | null; title: string; time: number; duration: number; section: string | null; game: string | null | undefined }) {
   const colour = (name: string) => {
     const rgb = spec ? paletteRgb(spec, name) : null;
     return rgb ? `rgb(${rgb.join(',')})` : undefined;
   };
-  const cutoff = pct(map.skip_cutoff_s, duration);
   return (
     <>
-      <div className="emulator-song-head">
-        <strong>Song map{map.bpm ? ` · ${map.bpm} bpm` : ''}{map.has_markers ? '' : ' · no markers (spec fallbacks)'}</strong>
-        <span>{section ?? ''}</span>
-        <span className="time">{time.toFixed(1)} / {duration.toFixed(1)} s</span>
+      <div className="song-head">
+        <span className="title">{title}{map.bpm ? ` · ${map.bpm} bpm` : ''}{game ? ` · ${game}` : ''}{map.has_markers ? '' : ' · no markers (spec fallbacks)'}</span>
+        <span>{section ? `now: ${section}` : ''}</span>
+        <span className="seek">
+          {seekTargets(map, time, SEEK_LEAD_S).map(t => (
+            <button key={t.label} type="button" onClick={() => playerApi.seek(t.to)}>{t.label} −{SEEK_LEAD_S} s</button>
+          ))}
+        </span>
+        <span className="time">{fmt(time)} / {fmt(duration)}</span>
       </div>
       <div
-        className="timeline-bar"
+        className="bar"
         onClick={e => {
           const box = e.currentTarget.getBoundingClientRect();
           playerApi.seek(((e.clientX - box.left) / box.width) * duration);
@@ -78,27 +84,36 @@ function Timeline({ map, spec, time, duration, section, game }: { map: SongMapIn
       >
         {segments(map, duration).map(s => {
           const { who, color } = sectionOwner(s, game);
+          const when = time >= s.end ? 'past' : time >= s.start ? 'cur' : '';
           return (
             <div
               key={s.start}
-              className="timeline-section"
+              className={`sec ${when}`}
               style={{ left: `${s.left}%`, width: `${s.width}%`, background: colour(color) }}
               title={`${s.label} ${s.index ?? ''} · ${s.start.toFixed(1)}–${s.end.toFixed(1)} s · ${who === 'both' ? 'both' : who === 'L' ? 'left' : 'right'} (${color})`}
             >
-              {s.width > 4 ? `${s.label}${who === 'both' ? '' : ` ${who}`}` : who === 'both' ? '' : who}
+              {s.width > 4 ? `${s.label}${who === 'both' ? '' : ` · ${who}`}` : who === 'both' ? '' : who}
             </div>
           );
         })}
-        <div className="timeline-cutoff" style={{ left: `${cutoff}%` }} title={`Skip cutoff ${map.skip_cutoff_s.toFixed(2)} s`} />
-        <div className="timeline-playhead" style={{ left: `${pct(time, duration)}%` }} />
-      </div>
-      <div className="emulator-macros">
-        {seekTargets(map, time, SEEK_LEAD_S).map(t => (
-          <button key={t.label} type="button" onClick={() => playerApi.seek(t.to)}>{t.label} −{SEEK_LEAD_S} s</button>
-        ))}
+        <div className="cut" style={{ left: `${pct(map.skip_cutoff_s, duration)}%` }} title={`Skip cutoff ${map.skip_cutoff_s.toFixed(2)} s`} />
+        <div className="ph" style={{ left: `${pct(time, duration)}%` }} />
       </div>
     </>
   );
+}
+
+/** The banner pill: the state and a sub-label; its colour is the state's. */
+function pill(e: ShowEvent | null): [string, string, string] {
+  switch (e?.state ?? 'idle') {
+    case 'idle': return ['IDLE', 'var(--text-muted)', 'waiting'];
+    case 'launching': return ['LAUNCHING', 'var(--pink, #FF1493)', 'counting'];
+    case 'intro': return ['INTRO', 'var(--pink, #FF1493)', `${e!.game} ${e!.step}`];
+    case 'failing': return ['FAIL', '#fff', 'counts differ'];
+  }
+  const th = e!.thunder;
+  if (th) return ['THUNDER', '#fff', th.phase === 'ready' ? 'steal now' : th.phase === 'steal' ? 'steal!' : `cooldown ${th.pct} %`];
+  return ['PLAYING', 'var(--pink, #FF1493)', e!.game ?? ''];
 }
 
 export function StageEmulator() {
@@ -119,7 +134,6 @@ export function StageEmulator() {
   });
   const [feed, setFeed] = useState<FeedLine[]>([]);
   const [slots, setSlots] = useState<Record<Slot, Sequence> | null>(null);
-  const [litRow, setLitRow] = useState<{ row: GuideRow; at: number } | null>(null);
   const [songMap, setSongMap] = useState<{ songId: number; map: SongMapInfo } | null>(null);
   const [nightLog, setNightLog] = useState<ShowLogLine[]>([]);
   const [pane, setPane] = useState<Pane>('feed');
@@ -136,9 +150,9 @@ export function StageEmulator() {
   const devicesRef = useRef<Device[] | null>(null);
 
   const feedId = useRef(0);
-  const addFeed = useCallback((kind: FeedKind, text: string, row?: GuideRow) => {
+  const addFeed = useCallback((kind: FeedKind, text: string, extra: FeedExtra = {}) => {
     const id = ++feedId.current;
-    setFeed(prev => [{ id, time: new Date(), kind, text, row }, ...prev].slice(0, FEED_SIZE));
+    setFeed(prev => [{ id, time: new Date(), kind, text, ...extra }, ...prev].slice(0, FEED_SIZE));
     return id;
   }, []);
   useEffect(() => {
@@ -173,7 +187,7 @@ export function StageEmulator() {
   useEffect(() => {
     if (!show) return;
     const text = showLine(show.event);
-    if (text !== lastShowLine.current) addFeed('show', text);
+    if (text !== lastShowLine.current) addFeed('show', `show → ${stateText(show.event, null)}`, { reply: `controller: ${text}` });
     lastShowLine.current = text;
   }, [show, addFeed]);
 
@@ -266,21 +280,21 @@ export function StageEmulator() {
     if (!action) return;
     const ctx = pressCtx();
     // the line goes up at once; the backend's answer can take a while (claps/special wait for their sequence)
-    const line = pressLine(side, gestureText(action, taps), action, ctx, '…', taps);
-    const id = addFeed('press', line.text, line.row);
-    setLitRow({ row: line.row, at: performance.now() });
+    const line = pressLine(side, gestureText(action, taps), action, ctx, taps);
+    const id = addFeed('press', line.text, { reply: 'controller: …', side });
     let answer: string;
+    let ignored = false;
     try {
       const res = await buttonsApi.press(action, { side, firstPressAgoMs: Math.max(0, Math.round(agoMs)), taps });
       answer = answerText(res);
+      ignored = res.status === 'ignored';
       // the meaning was written for the state the emulator knew; an ignore from another state says so
       const was = ctx.event?.state ?? 'idle';
       if (res.status === 'ignored' && res.show_state && res.show_state !== was) answer += ` (the controller was ${res.show_state}, not ${was})`;
     } catch (e) {
       answer = `error: ${e instanceof Error ? e.message : e}`;
     }
-    const text = line.text.replace(/…$/, answer);
-    setFeed(prev => prev.map(l => (l.id === id ? { ...l, text } : l)));
+    setFeed(prev => prev.map(l => (l.id === id ? { ...l, reply: `controller: ${answer}`, ignored } : l)));
   }, [addFeed, pressCtx]);
 
   const frame = useCallback(() => {
@@ -366,11 +380,16 @@ export function StageEmulator() {
   };
   // a plain function, not a component: this view re-renders every gesture tick, and a component made
   // here would be a new type each time, remounting the button between mousedown and mouseup (lost click)
-  const scriptButton = (id: string, label?: string) => (
-    <button key={id} type="button" onClick={() => run(script(id))} title={scriptTitle(script(id))} disabled={!spec}>{label ?? script(id).label}</button>
-  );
-  const launchButtons: [string, string][] = [
-    ['Solo', 'L1'], ['Duet', `both${clicks('duet')}`], ['Showoff', `both${clicks('showoff')}`], ['Thunder', `both${clicks('thunder')}`], ['Fail', 'L2R3'],
+  const scriptButton = (id: string, label?: React.ReactNode, launch = false) => {
+    const em = buttonState(id, ctxNow, launch);
+    return (
+      <button key={id} type="button" className={em?.state} onClick={() => run(script(id))} disabled={!spec}
+        title={`${scriptTitle(script(id))}${em?.why ? ` (${em.state === 'no' ? 'ignored now: ' : ''}${em.why})` : ''}`}>{label ?? script(id).label}</button>
+    );
+  };
+  const launchButtons: [string, string, string][] = [
+    ['Solo', 'L1', 'L×1'], ['Duet', `both${clicks('duet')}`, `Both×${clicks('duet')}`], ['Showoff', `both${clicks('showoff')}`, `Both×${clicks('showoff')}`],
+    ['Thunder', `both${clicks('thunder')}`, `Both×${clicks('thunder')}`], ['Fail', 'L2R3', 'L×2 + R×3'], ['Late', 'L1Rlate', 'L×1 then R×1'],
   ];
 
   const toggleDevice = async (device: Device) => {
@@ -379,100 +398,130 @@ export function StageEmulator() {
   };
 
   const event = show?.event ?? null;
-  const lit = (row: string) => (litRow && litRow.row === row && performance.now() - litRow.at < GUIDE_LIT_MS ? 'lit' : undefined);
-
-  // the big pillar buttons match the drawing's rings: the singer's colour, dim when not singing,
-  // and both pulse together at a change of singer
-  const ringOf = (side: Side) => {
-    if (event?.state !== 'playing' || !event.buttons || !spec) return undefined;
-    const c = paletteRgb(spec, buttonRings(event.buttons)[side]?.name ?? null);
-    const rgb = c ? `rgb(${c.join(',')})` : '#3a2a35';
-    return { borderColor: rgb, boxShadow: c ? `0 0 14px 2px ${rgb}` : 'none', '--ring': c ? rgb : '#fff' } as React.CSSProperties;
+  const colourOf = (name: string | null) => {
+    const c = name && spec ? paletteRgb(spec, name) : null;
+    return c ? `rgb(${c.join(',')})` : undefined;
   };
-  const pulse = (side: Side) => handover && event?.state === 'playing' && performance.now() - handover.at < handover.buttons.pulse_ms + 200 && (
-    <span key={handover.at} className="ring-pulse" aria-hidden
-      style={{ '--ms': `${handover.buttons.pulse_ms / handover.buttons.pulses}ms`, '--n': handover.buttons.pulses,
-        '--ring': spec && paletteRgb(spec, handover.buttons[side]) ? `rgb(${paletteRgb(spec, handover.buttons[side])!.join(',')})` : '#fff' } as React.CSSProperties} />
-  );
-
-  const pillar = (side: Side) => (
-    <div className={`emulator-pillar pillar-${side}`}>
-      {event?.thunder && <span className={`pole-role ${event.thunder.performer === side ? 'active' : ''}`}>{event.thunder.performer === side ? 'performing' : event.thunder.phase === 'ready' ? 'steal now!' : `rising ${event.thunder.pct} %`}</span>}
-      <button
-        type="button"
-        className={`emulator-button ${feedback[side].pressed ? 'pressed' : ''}`}
-        style={{ '--hold': feedback[side].hold, ...ringOf(side) } as React.CSSProperties}
-        onPointerDown={e => { if (e.button === 0) { e.currentTarget.setPointerCapture(e.pointerId); press(side); } }}
-        onPointerUp={() => release(side)}
-        onPointerCancel={() => release(side)}
-        onContextMenu={e => e.preventDefault()}
-        aria-label={`${side === 'L' ? 'Left' : 'Right'} pillar button`}
-      >
-        {pulse(side)}
-        {side === 'L' ? 'Left' : 'Right'} pillar
-        <small>{feedback[side].hold >= 0.15 ? 'hold…' : feedback[side].pending > 0 ? `${feedback[side].pending} taps…` : <kbd>{KEY_LABEL[side]}</kbd>}</small>
-      </button>
-    </div>
-  );
+  // each side's controls, drawn in the SVG by its pole
+  const sideSlot = (side: Side) => {
+    const role = poleRole(side, ctxNow);
+    const f = feedback[side];
+    return (
+      <div className={`side ${side}`}>
+        <h4>{side === 'L' ? 'Left' : 'Right'} pillar <span className={`role ${role.colour ? '' : 'dim'}`} style={{ '--rc': colourOf(role.colour) } as React.CSSProperties}>{role.text}</span></h4>
+        <div className="hint">{f.hold >= 0.15 ? 'hold…' : f.pending > 0 ? `${f.pending} tap${f.pending > 1 ? 's' : ''}…` : <>click = 1 tap · quick clicks = N taps · hold 1.5 s = stop · key <kbd>{KEY_LABEL[side]}</kbd></>}</div>
+        <div className="chips">
+          {[1, 2, 3, 4, 5].map(n => scriptButton(`${side}${n}`, `×${n}`))}
+          {scriptButton(`${side}hold`, 'hold')}
+        </div>
+        <div className="hint">pole: {role.pole}</div>
+      </div>
+    );
+  };
+  const [pillLabel, pillColour, pillSub] = pill(event);
+  const next = (side: Side) => {
+    const n = nextTextFor(ctxNow, side);
+    return <>{n.live && <em>{n.live}</em>}{n.live && ' · '}{n.text}{n.ignored?.map(x => <span key={x}> · <s>{x}</s></span>)}</>;
+  };
+  const sectionName = event?.song?.section ? `${event.song.section}${event.song.section_index ? ` ${event.song.section_index}` : ''}` : null;
 
   return (
     <div className="stage-emulator">
-      <div className="emulator-top">
-        <span className={`emulator-conn ${connected ? 'on' : 'off'}`}>{connected ? 'live' : 'offline'}</span>
-        <button type="button" className="emulator-mute" onClick={() => setMuted(m => !m)} aria-pressed={muted}
-          title="The emulator's claps sound (this browser only; the stage plays its own)">{muted ? 'Sound off' : 'Sound on'}</button>
-        {soundBlocked && !muted && <span className="emulator-sound-blocked">click once anywhere to enable sound</span>}
-        <p className="emulator-now" aria-live="polite"><strong>Now:</strong> {nowText(ctxNow)}. <strong>Next press does:</strong> {nextText(ctxNow)}.</p>
-      </div>
-
-      <div className="emulator-stage">
-        {pillar('L')}
-        {spec ? <StageView spec={spec} frame={frame} appliances={devices} /> : <div className="emulator-tstage" />}
-        {pillar('R')}
-        {badge && <div className="emulator-badge" role="status">{badge}</div>}
-      </div>
-
-      <section className="emulator-song" aria-label="Song map">
-        {songId !== null && songMap?.songId === songId && player ? (
-          <Timeline map={songMap.map} spec={spec} game={event?.game} time={player.current_time} duration={player.duration} section={event?.song?.section ? `${event.song.section}${event.song.section_index ? ` ${event.song.section_index}` : ''}` : null} />
-        ) : <p className="emulator-note">Song map: no song playing (or no analysis for it). Launch a game to see sections, turns and the skip cutoff.</p>}
+      <section className="emu-card emu-now" aria-live="polite">
+        <div className="pill" style={{ '--c': pillColour } as React.CSSProperties}>
+          <i className={`conn ${connected ? 'on' : 'off'}`} title={connected ? 'live' : 'offline'} />{pillLabel}<small>{pillSub}</small>
+        </div>
+        <div className="now-text">
+          <b>{nowText(ctxNow)}</b>
+          <div className="why" title={whyText(ctxNow, devices)}>{whyText(ctxNow, devices)}</div>
+        </div>
+        <div className="next" aria-label="What the next press on each side does">
+          <span className="who L">← Left next:</span><span className="what">{next('L')}</span>
+          <span className="who R">→ Right next:</span><span className="what">{next('R')}</span>
+        </div>
+        <div className="sound">
+          <button type="button" onClick={() => setMuted(m => !m)} aria-pressed={muted}
+            title="The emulator's claps sound (this browser only; the stage plays its own)">{muted ? 'Sound off' : 'Sound on'}</button>
+          {soundBlocked && !muted && <small className="blocked">click once to enable sound</small>}
+        </div>
       </section>
 
-      <section className="emulator-panes">
-        <div className="emulator-tabs" role="tablist">
-          {PANES.map(([id, label]) => (
-            <button key={id} type="button" role="tab" aria-selected={pane === id} className={pane === id ? 'active' : ''} onClick={() => setPane(id)}>{label}</button>
-          ))}
-          {pane === 'feed' && feed.length > 0 && <button type="button" className="emulator-clear" onClick={() => setFeed([])}>Clear</button>}
-        </div>
-        <div className="emulator-pane emulator-feed" hidden={pane !== 'feed'}>
-          {feed.length === 0 ? <p className="emulator-note">Every press, and what the controller did in reply, newest first.</p> : (
-            <ol className="emulator-log" aria-label="Controller feed, newest first">
-              {feed.map(l => <li key={l.id} className={`feed-${l.kind}`}><span>{l.time.toLocaleTimeString()}</span>{l.text}</li>)}
-            </ol>
-          )}
-        </div>
-        <div className="emulator-pane" hidden={pane !== 'rules'}>
-          <LightRules spec={spec} state={event?.state} game={event?.game} />
-        </div>
-        <div className="emulator-pane" hidden={pane !== 'log'}>
-          <ul className="emulator-log">
-            {nightLog.slice().reverse().map(l => (
-              <li key={`${l.mono}-${l.type}-${l.t}`}><span>{l.t.slice(11, 19)}</span>{describeLogLine(l)}</li>
+      <section className="emu-card emu-stage" aria-label="Stage">
+        {spec ? <StageView spec={spec} frame={frame} appliances={devices} onPress={press} onRelease={release} feedback={feedback} sideSlot={sideSlot} /> : <div className="emulator-tstage" />}
+        {badge && <div className="emulator-badge" role="status">{badge}</div>}
+      </section>
+
+      <div className="emu-dock">
+        <section className="emu-card emu-press" aria-label="Test presses">
+          <h3 title="From idle; presses like a person would. Hover any button for what it sends and does now.">Launch a game <span>from idle</span></h3>
+          <div className="grid3">
+            {launchButtons.map(([label, id, sub]) => <Fragment key={label}>{scriptButton(id, <>{label}<small>{sub}</small></>, true)}</Fragment>)}
+          </div>
+          <h3>Both pillars <span>first presses {BOTH_OFFSET_MS} ms apart</span></h3>
+          <div className="grid4">
+            {[1, 2, 3].map(n => scriptButton(`both${n}`))}
+            {/* Both pillar buttons at the same instant: tap counts launch duet/showoff/thunder, hold stops */}
+            <button
+              type="button"
+              title="Press and release both pillars at the same instant, as many times as you click; hold for a long press on both"
+              className={`emulator-both ${buttonState('bothlive', ctxNow)?.state ?? ''} ${feedback.L.pressed && feedback.R.pressed ? 'pressed' : ''}`}
+              onPointerDown={e => { if (e.button === 0) { e.currentTarget.setPointerCapture(e.pointerId); SIDES.forEach(press); } }}
+              onPointerUp={() => SIDES.forEach(release)}
+              onPointerCancel={() => SIDES.forEach(release)}
+              onContextMenu={e => e.preventDefault()}
+            >
+              Both live
+            </button>
+          </div>
+          <h3 title="While a song plays. In thunder, 1 tap on the flickering side steals (the side chips).">In song <span>left pillar</span></h3>
+          <div className="grid4">
+            {scriptButton('L2', <>Claps<small>×2</small></>)}
+            {scriptButton('L3', <>Special<small>×3</small></>)}
+            {scriptButton('L4', <>Skip<small>×4</small></>)}
+            {scriptButton('Lhold', <>Stop<small>hold</small></>)}
+          </div>
+        </section>
+
+        <section className="emu-card emu-panes">
+          <div className="tabs" role="tablist">
+            {PANES.map(([id, label]) => (
+              <button key={id} type="button" role="tab" aria-selected={pane === id} className={pane === id ? 'active' : ''} onClick={() => setPane(id)}>{label}</button>
             ))}
-          </ul>
-        </div>
-        <div className="emulator-pane emulator-status-pane" hidden={pane !== 'status'}>
-          <dl className="emulator-status">
-            <dt>State</dt><dd>{event?.state ?? 'idle'}{event?.game ? ` · ${event.game}` : ''}{event?.step ? ` · ${event.step}` : ''}</dd>
-            <dt>Song</dt><dd>{player?.current_song ? `${player.current_song.title}` : '—'}</dd>
-            <dt>Time</dt><dd>{player?.current_song ? `${player.current_time.toFixed(1)} / ${player.duration.toFixed(1)} s` : '—'}</dd>
-            <dt>Section</dt><dd>{event?.song?.section ?? '—'}</dd>
-            <dt>Thunder</dt>
-            <dd>{event?.thunder ? `${event.thunder.phase} · ${event.thunder.performer} performs · ${event.thunder.pct} %` : '—'}</dd>
-          </dl>
-          <div>
-            <h3>Appliances</h3>
+            {pane === 'feed' && feed.length > 0 && <button type="button" className="emulator-clear" title="Clear the feed" aria-label="Clear the feed" onClick={() => setFeed([])}>✕</button>}
+          </div>
+          <div className="emu-pane" hidden={pane !== 'feed'}>
+            {feed.length === 0 ? <p className="emulator-note">Every press, and what the controller did in reply, newest first.</p> : (
+              <ol className="feed" aria-label="Controller feed, newest first">
+                {feed.map((l, i) => (
+                  <li key={l.id} className={`feed-${l.kind} ${i === 0 ? 'new' : ''}`}>
+                    <span className="t">{l.time.toLocaleTimeString()}</span>
+                    {l.side && <span className={`s ${l.side}`}>{l.side}</span>}
+                    {l.text}
+                    {l.reply && <span className={`reply ${l.ignored ? 'ign' : ''}`}>↳ {l.reply}</span>}
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+          <div className="emu-pane" hidden={pane !== 'rules'}>
+            <LightRules spec={spec} state={event?.state} game={event?.game} />
+          </div>
+          <div className="emu-pane" hidden={pane !== 'log'}>
+            <ul className="emulator-log">
+              {nightLog.slice().reverse().map(l => (
+                <li key={`${l.mono}-${l.type}-${l.t}`}><span>{l.t.slice(11, 19)}</span>{describeLogLine(l)}</li>
+              ))}
+            </ul>
+          </div>
+          <div className="emu-pane emulator-status-pane" hidden={pane !== 'status'}>
+            <dl className="emulator-status">
+              <dt>State</dt><dd>{event?.state ?? 'idle'}{event?.game ? ` · ${event.game}` : ''}{event?.step ? ` · ${event.step}` : ''}</dd>
+              <dt>Song</dt><dd>{player?.current_song ? `${player.current_song.title}` : '—'}</dd>
+              <dt>Time</dt><dd>{player?.current_song ? `${player.current_time.toFixed(1)} / ${player.duration.toFixed(1)} s` : '—'}</dd>
+              <dt>Section</dt><dd>{event?.song?.section ?? '—'}</dd>
+              <dt>Thunder</dt>
+              <dd>{event?.thunder ? `${event.thunder.phase} · ${event.thunder.performer} performs · ${event.thunder.pct} %` : '—'}</dd>
+            </dl>
             {devices.length === 0 ? <p className="emulator-note">No devices. Run scripts/seed_emulator.py.</p> : (
               <div className="emulator-devices">
                 {devices.map(d => (
@@ -481,71 +530,18 @@ export function StageEmulator() {
               </div>
             )}
           </div>
-        </div>
-      </section>
+        </section>
+      </div>
 
-      <section className="emulator-side emulator-buttons" aria-label="Test buttons">
-        <h3 title={`From idle; presses like a person would. Hover any button for what it sends and does now.`}>Launch a game</h3>
-        <div className="emulator-macros">
-          {launchButtons.map(([label, id]) => <span key={label}>{scriptButton(id, `${label} = ${script(id).label}`)}</span>)}
-          {scriptButton('L1Rlate')}
-        </div>
-        <h3 title={`N+N taps, first presses ${BOTH_OFFSET_MS} ms apart (inside the sync window).`}>Both pillars together</h3>
-        <div className="emulator-macros">
-          {[1, 2, 3].map(n => scriptButton(`both${n}`))}
-          {/* Both pillar buttons at the same instant: tap counts launch duet/showoff/thunder, hold stops */}
-          <button
-            type="button"
-            title="Press and release both pillars at the same instant, as many times as you click; hold for a long press on both"
-            className={`emulator-both ${feedback.L.pressed && feedback.R.pressed ? 'pressed' : ''}`}
-            onPointerDown={e => { if (e.button === 0) { e.currentTarget.setPointerCapture(e.pointerId); SIDES.forEach(press); } }}
-            onPointerUp={() => SIDES.forEach(release)}
-            onPointerCancel={() => SIDES.forEach(release)}
-            onContextMenu={e => e.preventDefault()}
-          >
-            Both pressed (live)
-          </button>
-        </div>
-        <h3 title={`Quick taps on one pillar (200 ms apart); hold = long press.`}>Single pillar taps</h3>
-        {SIDES.map(side => (
-          <div key={side} className="emulator-macros">
-            {[1, 2, 3, 4, 5].map(n => scriptButton(`${side}${n}`))}
-            {scriptButton(`${side}hold`)}
-          </div>
-        ))}
-        <h3 title={`While a song plays. In thunder, 1 tap on the flickering side steals.`}>In-song</h3>
-        <div className="emulator-macros">
-          {scriptButton('L2', 'Claps = L×2')}
-          {scriptButton('L3', 'Special = L×3')}
-          {scriptButton('L4', 'Skip = L×4')}
-          {scriptButton('Lhold', 'Stop = L hold')}
-        </div>
-        <details className="press-guide-box">
-          <summary title="Every gesture and what it does; the row of your last press lights up">Press guide</summary>
-          <div className="press-guide" aria-label="Press guide">
-          <strong>Keys</strong>
-          <span><kbd>←</kbd> left · <kbd>→</kbd> right · hold 1.5 s = long press</span>
-          <strong>Idle</strong>
-          <span className={lit('idle-1')}>one side, any taps · solo</span>
-          <span className={lit(`idle-${clicks('duet')}`)}>both {clicks('duet')}+{clicks('duet')} · duet</span>
-          <span className={lit(`idle-${clicks('showoff')}`)}>both {clicks('showoff')}+{clicks('showoff')} · showoff</span>
-          <span className={lit(`idle-${clicks('thunder')}`)}>both {clicks('thunder')}+{clicks('thunder')} · thunder</span>
-          <span className={lit('idle-4')}>counts differ or 4+ · fail blink</span>
-          <strong>In song</strong>
-          <span className={lit('claps')}>2 taps · claps</span>
-          <span className={lit('special')}>3 taps · special</span>
-          <span className={lit('skip')}>4 taps · skip (until mid verse 2)</span>
-          <span className={lit('steal')}>1 tap · thunder steal (flickering side)</span>
-          <span className={lit('stop')}>hold · stop</span>
-          </div>
-        </details>
-        <ul className="emulator-legend" aria-label="Colour legend">
-          {LEGEND.map(([name, role]) => {
-            const rgb = spec ? paletteRgb(spec, name) : null;
-            return <li key={name}><span style={{ background: rgb ? `rgb(${rgb.join(',')})` : undefined }} />{name} = {role}</li>;
-          })}
-          <li>dots = perimeter LEDs · bars = poles (fill %) · lamps = appliances (lit when on)</li>
-        </ul>
+      <section className="emu-card emu-song" aria-label="Song map">
+        {songId !== null && songMap?.songId === songId && player ? (
+          <Timeline map={songMap.map} spec={spec} title={player.current_song?.title ?? 'Song map'} game={event?.game} time={player.current_time} duration={player.duration} section={sectionName} />
+        ) : (
+          <>
+            <div className="song-head"><span className="title">Song map</span><span className="time">–</span></div>
+            <div className="song-empty">No song playing (or no analysis for it). Launch a game to see the sections, whose turn each one is and the skip cutoff.</div>
+          </>
+        )}
       </section>
     </div>
   );

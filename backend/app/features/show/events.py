@@ -49,8 +49,23 @@ def intro(game: str, count: int, side: str | None = None) -> ShowEvent:
                   perimeter=Perimeter(look="intro", color="white", side=_THUNDER[count]))
 
 
-def playing(game: str, song_id: int) -> ShowEvent:
-    return _event("playing", {}, game=game, song=SongInfo(id=song_id))
+# Showoff colours by turn (spec: verses lime then blue, everything else both = pink)
+TURN_COLOR = {"L": "lime", "R": "blue", "both": "pink"}
+
+
+def playing(game: str, song_id: int, section: tuple[str, int] | None = None, turn: str | None = None,
+            t: float = 0.0) -> ShowEvent:
+    label, index = section or (None, None)
+    perimeter = Perimeter(look="turn", color=TURN_COLOR[turn], side=turn) if turn else None
+    return _event("playing", {}, game=game, song=SongInfo(id=song_id, section=label, section_index=index, t=round(t, 2)),
+                  turn=turn, perimeter=perimeter)
+
+
+def legacy_start(game: str):
+    """What a plain `start` press broadcasts, so StageLeds and the pillars (which only know
+    legacy actions) enter their play look when a game's song starts."""
+    from app.features.buttons.router import ButtonEvent
+    return ButtonEvent(action="start", timestamp=datetime.now(), playlist_name=game)
 
 
 def fail_blink(lit: str) -> ShowEvent:

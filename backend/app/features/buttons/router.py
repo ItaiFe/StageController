@@ -257,7 +257,7 @@ async def end_game_on_stop(action: ButtonAction):
     """A legacy stop also ends any game the show director is running."""
     if action == "stop":
         from app.features.show.service import director
-        await director.to_idle()
+        await director.to_idle("stop")
 
 
 @router.post("/press")

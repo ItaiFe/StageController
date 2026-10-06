@@ -21,6 +21,7 @@ export interface ShowEvent {
   poles: { L: Pole; R: Pole };
   perimeter: { look: string; color: string | null; side: 'L' | 'R' | 'both' | 'centre' | null } | null;
   song: { id: number; section: string | null; section_index: number | null; t: number } | null;
+  turn: 'L' | 'R' | 'both' | null;
   thunder: { phase: string; pole: 'L' | 'R'; beat: number } | null;
 }
 
@@ -76,6 +77,8 @@ export function describeEvent(data: { action: string; [key: string]: unknown }):
   const parts: string[] = [e.state];
   if (e.game) parts.push(e.game);
   if (e.step !== null) parts.push(`step ${e.step}`);
+  if (e.song?.section) parts.push(`${e.song.section} ${e.song.section_index ?? ''}`.trim());
+  if (e.turn) parts.push(`turn ${e.turn}`);
   if (e.state !== 'idle') parts.push(`L ${e.poles.L.pct}% R ${e.poles.R.pct}%`);
   return parts.join(' · ');
 }

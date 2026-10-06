@@ -50,7 +50,7 @@ perimeter instruction.
 | `idle` | nothing running (also after a song, a stop or a failed launch) | all `off`. **Fall back to your own slot sequences** (idle rainbow, start comet, ...) exactly as without a show. |
 | `launching` | after each launch gesture, until the decision | the presser's pole at `launchPcts[count-1]` (33/66/100), pink, solid; the other pole as it was |
 | `intro` | the 3-2-1, `step` 3 then 2 then 1, one event per `introStepMs` | `polePcts` (100/66/33) in the game's colours, see below |
-| `playing` | the song started (pole back to 0, the scene takes over) | both `off`; `song.id` set |
+| `playing` | the song started (pole back to 0, the scene takes over), and again whenever the song's section or the showoff turn changes | both `off`; `song` set (see below) |
 | `failing` | mismatched launch: `failBlinkCount` events alternating L, R, L, R each `failBlinkMs` (white, solid), then one `drain` event (`ms` = `failFadeMs`) on the last lit pole, then `idle` | one white pole at a time |
 
 `game`: `solo | duet | showoff | thunder` (absent while launching/failing/idle).
@@ -61,9 +61,23 @@ then both poles pink with `perimeter.look = "merge"` at 1; thunder -- both poles
 perimeter L at 3, R at 2, centre at 1. Launch-fill colour (pink) is a placeholder: the spec only
 fixes the percentages.
 
-Later slices add `song.section`, `song.section_index`, `song.t`, a showoff `turn`, and the
-`thunder` block (`phase`, `pole`, `beat`) to `playing` events. Fields already in the schema are
-stable; unknown fields must be ignored.
+When a game's song starts the controller first broadcasts the **legacy** button event
+`{"action":"start","playlist_name":"<game>"}` (exactly what a plain start press sends), then the
+first `playing` show event. Clients that only know legacy actions (StageLeds, pillar firmware)
+therefore enter their "play" look as before; a later `idle` show event is followed by the
+existing legacy `stop` on song end.
+
+`playing` events carry `song`: `id`, `section` (the analyzer's label: `intro | verse | chorus |
+bridge | instrumental | outro`, `null` when the song has no sidecar markers), `section_index`
+(the analyzer's running number for that label), `t` (song seconds when the event was sent).
+Showoff only: `turn` = `L | R | both` -- verses alternate L, R, L ...; every other section and the
+last section is `both` -- with `perimeter = {look: "turn", color: lime | blue | pink, side: turn}`.
+Other games send `turn: null`. A turn event is sent at the section boundary (within one ~20 ms
+tick), not ahead of it. The `thunder` block (`phase`, `pole`, `beat`) comes with the thunder slice.
+Fields already in the schema are stable; unknown fields must be ignored.
+
+Skip in song is accepted until the middle of verse 2 (`skipFallbackMs` without markers); later
+skips answer `{"status":"ignored","reason":"after_cutoff"}`.
 
 ## 4. Ordering and latency
 

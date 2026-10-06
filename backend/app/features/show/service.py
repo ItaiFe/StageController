@@ -5,21 +5,34 @@ whole launches instantly without mpv or a database. The real adapter is StagePla
 """
 import asyncio
 import time
+from dataclasses import dataclass
 from functools import partial
 
 from app.features.buttons.rules import IDLE_TAPS, IN_SONG
 
 from . import events, tunables
+from . import analytics
 from .launch import LaunchArbiter, LaunchResult
+from .models import ShowTunable
 from .schemas import Pole
+from .songmap import SongMap
 
 TICK_S = 0.02
+# analytics press kind by in-song meaning (anything else is "ordinary")
+PRESS_KIND = {"skip": "skip", "claps": "applause"}
 INTRO_STEPS = tunables.SPEC["intro"]["steps"]
 
 
 class Clock:
     def now_ms(self) -> int:
         return int(time.monotonic() * 1000)
+
+
+@dataclass
+class SongStatus:
+    id: int
+    t: float  # seconds into the song
+    duration: float
 
 
 class StagePlayer:
@@ -40,9 +53,24 @@ class StagePlayer:
             db.close()
         return player.get_current_song_id()
 
-    def song_loaded(self) -> bool:
+    def status(self) -> SongStatus | None:
         from app.features.player.service import player
-        return player.get_current_song_id() is not None
+        state = player.get_state()
+        song = state["current_song"]
+        return SongStatus(song["id"], state["current_time"], state["duration"]) if song else None
+
+    def song_map(self) -> SongMap:
+        from app.core.config import MUSIC_DIR
+        from app.core.database import SessionLocal
+        from app.features.player.service import player
+        from app.features.songs.models import Song
+
+        db = SessionLocal()
+        try:
+            song = db.get(Song, player.get_current_song_id())
+            return SongMap.for_audio(song.file_path, MUSIC_DIR) if song else SongMap(None, [], [])
+        finally:
+            db.close()
 
     async def run_action(self, action: str) -> None:
         from app.core.database import SessionLocal
@@ -61,10 +89,16 @@ async def _broadcast(event) -> None:
 
 
 class ShowDirector:
-    def __init__(self, player, clock, emit):
+    def __init__(self, player, clock, emit, log=None):
         self._player = player
         self._clock = clock
         self._emit = emit
+        self._log_to = log
+        self._map = SongMap(None, [], [])
+        self._song_id: int | None = None
+        self._song_started_ms = 0
+        self._t = 0.0  # song time at the last tick
+        self._key = None  # (section, turn) of the last playing event
         self._arbiter = LaunchArbiter()
         self._poles: dict[str, Pole] = {}
         self._timeline: list[tuple[int, object]] = []  # (due_ms, async callable), in due order
@@ -86,13 +120,24 @@ class ShowDirector:
                 await self._emit(events.launching(self._poles))
             return self._ok(action, side)
         if action == "stop" and self.state in ("intro", "playing"):
-            await self.to_idle()
+            if self.state == "playing":
+                self._log("press", side=side, kind="stop")
+            await self.to_idle("stop")
             await self._player.run_action("stop")
             return self._ok(action, side)
-        if self.state == "playing" and IN_SONG[action] != "tap":
-            await self._player.run_action(IN_SONG[action])
-            return self._ok(action, side)
-        return self._ignored(action, self.state if self.state != "playing" else "ordinary")
+        if self.state != "playing":
+            return self._ignored(action, self.state)
+        what = IN_SONG[action]
+        if what == "skip" and (status := self._player.status()) and status.t > self._map.skip_cutoff_s():
+            self._log("press", side=side, kind="ordinary")
+            return self._ignored(action, "after_cutoff")
+        self._log("press", side=side, kind=PRESS_KIND.get(what, "ordinary"))
+        if what == "tap":
+            return self._ignored(action, "ordinary")
+        await self._player.run_action(what)
+        if what == "skip":
+            await self._after_skip()
+        return self._ok(action, side)
 
     async def tick(self) -> None:
         now = self._clock.now_ms()
@@ -101,11 +146,15 @@ class ShowDirector:
         while self._timeline and self._timeline[0][0] <= now:
             _, step = self._timeline.pop(0)
             await step()
-        if self.state == "playing" and not self._player.song_loaded():
-            await self.to_idle()  # song ended or was stopped from somewhere else
+        if self.state == "playing":
+            if status := self._player.status():
+                await self._follow(status)
+            else:
+                await self.to_idle()  # song ended or was stopped from somewhere else
 
-    async def to_idle(self) -> None:
+    async def to_idle(self, reason: str = "finished") -> None:
         was_idle = self.state == "idle"
+        self._end_song(reason)
         self._arbiter.reset()
         self._poles = {}
         self._timeline = []
@@ -122,7 +171,12 @@ class ShowDirector:
             except Exception as e:  # a broken tick must not end the show loop
                 print(f"Show director tick failed: {e}")
 
+    def _log(self, kind: str, /, **fields) -> None:
+        if self._log_to:
+            self._log_to(kind, self._clock.now_ms(), **fields)
+
     def _decide(self, result: LaunchResult, now: int) -> None:
+        self._log("launch_attempt", countL=result.count_l, countR=result.count_r, gapMs=result.gap_ms, result=result.game)
         self._poles = {}
         if result.game == "fail":
             self._schedule_fail(now)
@@ -155,7 +209,43 @@ class ShowDirector:
             print(f"Show: no song to play for game {game!r} (missing or empty playlist)")
             await self.to_idle()
             return
-        await self._emit(events.playing(game, song_id))
+        await self._emit(events.legacy_start(game))
+        await self._begin_song(song_id)
+
+    async def _begin_song(self, song_id: int) -> None:
+        self._song_id = song_id
+        self._song_started_ms = self._clock.now_ms()
+        self._key = None
+        self._map = self._player.song_map()
+        self._log("song_start", songId=str(song_id), game=self.game, bpm=self._map.bpm,
+                  hasSections=self._map.has_markers, hasBeats=bool(self._map.beats))
+        if not self._map.has_markers:
+            self._log("fault", kind="markers_missing", detail=f"song {song_id}: no usable sections, using spec fallbacks")
+        if status := self._player.status():
+            await self._follow(status)
+
+    async def _follow(self, status: SongStatus) -> None:
+        """One playing event whenever the section or the showoff turn changes."""
+        self._t = status.t
+        section = self._map.section_at(status.t)
+        turn = self._map.turn_owner(status.t, status.duration) if self.game == "showoff" else None
+        if (section, turn) != self._key:
+            self._key = (section, turn)
+            await self._emit(events.playing(self.game, status.id, section, turn, status.t))
+
+    async def _after_skip(self) -> None:
+        self._end_song("skip")
+        if status := self._player.status():
+            await self._begin_song(status.id)  # same game, next song (a one-song playlist replays it)
+        else:
+            await self.to_idle()
+
+    def _end_song(self, reason: str) -> None:
+        if self._song_id is None:
+            return
+        self._log("song_end", songId=str(self._song_id), game=self.game, reason=reason,
+                  playedMs=self._clock.now_ms() - self._song_started_ms, atMs=int(self._t * 1000))
+        self._song_id = None
 
     def _ok(self, action, side) -> dict:
         return {"status": "ok", "action": action, "side": side, "show_state": self.state}
@@ -164,4 +254,21 @@ class ShowDirector:
         return {"status": "ignored", "action": action, "reason": reason, "show_state": self.state}
 
 
-director = ShowDirector(StagePlayer(), Clock(), _broadcast)
+def load_tunables(db) -> None:
+    """Apply the saved tunable overrides (at startup)."""
+    for row in db.query(ShowTunable).all():
+        if row.id in tunables.defaults():  # a tunable dropped from the spec is ignored
+            tunables.set_override(row.id, row.value)
+
+
+def save_tunable(db, tunable_id: str, value) -> None:
+    row = db.get(ShowTunable, tunable_id)
+    if row:
+        row.value = value
+    else:
+        db.add(ShowTunable(id=tunable_id, value=value))
+    db.commit()
+    tunables.set_override(tunable_id, value)
+
+
+director = ShowDirector(StagePlayer(), Clock(), _broadcast, analytics.append)

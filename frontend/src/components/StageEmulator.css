@@ -173,3 +173,45 @@
   color: var(--text-muted);
   margin-right: 0.6rem;
 }
+
+.timeline-bar {
+  position: relative;
+  height: 2.2rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #0d0a0b;
+  cursor: pointer;
+}
+
+.timeline-section {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  opacity: 0.55;
+  border-right: 1px solid #0d0a0b;
+  color: #000;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.timeline-cutoff {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 0;
+  border-left: 2px dashed var(--danger);
+  pointer-events: none;
+}
+
+.timeline-playhead {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  background: #fff;
+  pointer-events: none;
+}

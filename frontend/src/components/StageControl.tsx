@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Device, Sequence, SequenceStep } from '../api';
 import { devicesApi, sequencesApi } from '../api';
 import { SequenceFlowChart } from './SequenceFlowChart';
+import { ShowTunables } from './ShowTunables';
 import { useOverlayDismiss } from '../hooks/useOverlayDismiss';
 import './StageControl.css';
 
@@ -224,6 +225,8 @@ export function StageControl({ onOpenDeviceModal, onOpenSequenceModal, refreshKe
           </div>
         )}
       </section>
+
+      <ShowTunables />
     </div>
   );
 }

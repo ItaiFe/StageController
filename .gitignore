@@ -14,6 +14,7 @@ backend/static/
 # Live show data (not code)
 data/db.sqlite
 data/music/
+data/show-events.jsonl
 
 # macOS
 .DS_Store

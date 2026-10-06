@@ -57,5 +57,7 @@ describe('describeEvent', () => {
     const e = { action: 'show', state: 'intro', game: 'duet', step: 3, poles: { L: pole({ pct: 100 }), R: pole({ pct: 100 }) } };
     expect(describeEvent(e)).toBe('intro · duet · step 3 · L 100% R 100%');
     expect(describeEvent({ action: 'claps' })).toBe('button claps');
+    const playing = { action: 'show', state: 'playing', game: 'showoff', step: null, poles: e.poles, turn: 'R', song: { id: 1, section: 'verse', section_index: 2, t: 105 } };
+    expect(describeEvent(playing)).toBe('playing · showoff · verse 2 · turn R · L 100% R 100%');
   });
 });

@@ -51,4 +51,5 @@ class ShowEvent(BaseModel):
     poles: Poles
     perimeter: Perimeter | None = None
     song: SongInfo | None = None
+    turn: Literal["L", "R", "both"] | None = None  # showoff: whose turn it is
     thunder: ThunderInfo | None = None

@@ -1,6 +1,8 @@
 import type { ButtonAction } from './buttonGesture';
 import type { Sequence as PillarSequence, Slot } from './pillar/types';
 import type { ShowSpec } from './show/events';
+import type { SongMapInfo } from './show/timeline';
+import type { Tunable } from './show/tunables';
 
 const API_BASE = import.meta.env.DEV ? 'http://localhost:8000/api' : '/api';
 
@@ -397,9 +399,38 @@ export const buttonsApi = {
   },
 };
 
+export type ShowLogLine = { t: string; mono: number; type: string; [field: string]: unknown };
+
 export const showApi = {
   getSpec: async (): Promise<ShowSpec> => {
     const res = await fetch(`${API_BASE}/show/spec`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  },
+
+  getTunables: async (): Promise<Tunable[]> => {
+    const res = await fetch(`${API_BASE}/show/tunables`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  },
+
+  setTunable: async (id: string, value: number | number[]): Promise<void> => {
+    const res = await fetch(`${API_BASE}/show/tunables/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  },
+
+  getSongMap: async (songId: number): Promise<SongMapInfo> => {
+    const res = await fetch(`${API_BASE}/show/songmap/${songId}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  },
+
+  getLog: async (limit = 30): Promise<ShowLogLine[]> => {
+    const res = await fetch(`${API_BASE}/show/log?limit=${limit}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   },

@@ -4,6 +4,7 @@ import socket
 from typing import Optional
 from sqlalchemy.orm import Session
 
+from app.core import config
 from .models import Device, Sequence, SequenceStep
 from .schemas import DeviceCreate, DeviceUpdate, SequenceCreate, SequenceUpdate, DiscoveredDevice
 
@@ -11,8 +12,23 @@ from .schemas import DeviceCreate, DeviceUpdate, SequenceCreate, SequenceUpdate,
 TASMOTA_TIMEOUT = 5.0
 
 
+_emulated_power: dict[str, bool] = {}
+
+
+def _emulated_tasmota(ip: str, command: str) -> dict:
+    if command == "Status":
+        return {"Status": {"DeviceName": f"emulated-{ip}"}}
+    if command == "Power%20On":
+        _emulated_power[ip] = True
+    elif command == "Power%20Off":
+        _emulated_power[ip] = False
+    return {"POWER": "ON" if _emulated_power.get(ip) else "OFF"}
+
+
 async def tasmota_command(ip: str, command: str) -> dict:
     """Send a command to a Tasmota device."""
+    if config.STAGE_IO == "emulated":
+        return _emulated_tasmota(ip, command)
     url = f"http://{ip}/cm?cmnd={command}"
     async with httpx.AsyncClient(timeout=TASMOTA_TIMEOUT) as client:
         try:

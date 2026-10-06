@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 # Base paths
@@ -16,3 +17,6 @@ API_PREFIX = "/api"
 # Upload settings
 MAX_UPLOAD_SIZE = 100 * 1024 * 1024  # 100MB
 ALLOWED_AUDIO_EXTENSIONS = {".mp3", ".flac", ".wav", ".ogg", ".aac", ".m4a", ".wma"}
+
+# "emulated" answers Tasmota calls from memory so the whole app runs on a laptop with no hardware
+STAGE_IO = os.environ.get("STAGE_IO", "")

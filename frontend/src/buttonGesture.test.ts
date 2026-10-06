@@ -9,6 +9,16 @@ function tap(d: GestureDetector, at: number, held = 50): number {
 }
 
 describe('GestureDetector', () => {
+  it('remembers when the first press of the gesture started', () => {
+    const d = new GestureDetector();
+    tap(d, 1000);
+    const up = tap(d, 1200);
+    expect(d.tick(up + GAP_MS)).toEqual({ kind: 'taps', count: 2 });
+    expect(d.firstPressAt).toBe(1000);
+    tap(d, 5000);
+    expect(d.firstPressAt).toBe(5000);
+  });
+
   it('emits a single tap only after the gap passes', () => {
     const d = new GestureDetector();
     const up = tap(d, 0);

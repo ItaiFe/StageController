@@ -36,8 +36,11 @@ def get_songmap(song_id: int, db: Session = Depends(get_db)):
         raise HTTPException(404, "Song not found")
     m = SongMap.for_audio(song.file_path, MUSIC_DIR)
     # only the marks, not the analyzer's lyrics and other per-section extras
+    # turn: showoff's alternation; singer: duet, a hand-tagged sidecar
+    # `turn` where there is one, else the same alternation
     sections = [{"start": s["start"], "end": s["end"], "label": s["label"], "index": s.get("index"),
-                 "turn": (turn := m.turn_owner((s["start"] + s["end"]) / 2)), "color": TURN_COLOR[turn]}
+                 "turn": (turn := m.turn_owner(mid := (s["start"] + s["end"]) / 2)), "color": TURN_COLOR[turn],
+                 "singer": (singer := m.singer(mid)), "singer_color": TURN_COLOR[singer]}
                 for s in m.sections]
     return {"bpm": m.bpm, "has_markers": m.has_markers, "sections": sections, "skip_cutoff_s": m.skip_cutoff_s()}
 

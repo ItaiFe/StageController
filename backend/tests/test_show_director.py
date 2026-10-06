@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from app.features.show import tunables
+from app.features.show.scene import scene_for
 from app.features.show.service import ShowDirector, SongStatus
 from app.features.show.songmap import SongMap
 
@@ -28,6 +29,10 @@ class FakePlayer:
         self.map = SongMap(None, [], [])
         self.started: list[str] = []
         self.actions: list[str] = []
+        self.devices = {"floodLights (x2)": False, "spotlights": False, "smoke": False}
+
+    async def apply_scene(self, section):
+        self.devices.update(scene_for(section, list(self.devices)))
 
     async def start_game(self, game):
         self.started.append(game)
@@ -59,8 +64,8 @@ class Rig:
 
         self.director = ShowDirector(self.player, self.clock, emit, lambda kind, mono, /, **f: self.log.append((kind, mono, f)))
 
-    def press(self, action, side, ago=0):
-        return asyncio.run(self.director.on_press(action, side, ago))
+    def press(self, action, side, ago=0, taps=None):
+        return asyncio.run(self.director.on_press(action, side, ago, taps))
 
     def advance(self, ms):
         end = self.clock.t + ms
@@ -234,6 +239,23 @@ def test_song_vanishing_under_the_director_is_noticed():
     assert rig.director.state == "idle"
 
 
+
+def test_stop_while_the_start_sequence_runs_leaves_no_music_playing():
+    rig = Rig()
+    real_start = rig.player.start_game
+
+    async def start_then_stop(game):
+        song_id = await real_start(game)
+        await rig.director.on_press("stop", "L")  # long press during the main sequence's delays
+        rig.player.loaded = True  # ...which then loads the song anyway
+        return song_id
+
+    rig.player.start_game = start_then_stop
+    rig.press("start", "L")
+    rig.advance(500 + 3000 + STEP)
+    assert rig.director.state == "idle" and not rig.player.loaded
+    assert rig.legacy == [] and kinds(rig, "song_start") == []
+
 def test_empty_playlist_goes_back_to_idle():
     rig = Rig(song_id=None)
     rig.press("start", "L")
@@ -384,3 +406,245 @@ def test_missing_markers_log_a_fault_and_the_game_still_plays():
     seek(rig, 30)
     assert [e.turn for e in playing_events(rig)] == ["L", "R"]  # fallbackTurnMs = 20 s
     assert all(e.song.section is None for e in playing_events(rig))
+
+
+def play_song(rig, until):
+    """Song time runs with the clock, tick by tick."""
+    while rig.player.t < until:
+        rig.player.t = round(rig.player.t + STEP / 1000, 3)
+        rig.advance(STEP)
+
+
+def thunder_events(rig):
+    return [e for e in playing_events(rig) if e.thunder]
+
+
+
+
+
+
+
+def test_other_games_have_no_thunder():
+    rig = Rig()
+    play_game(rig, "start")
+    seek(rig, 120.0)
+    play_song(rig, 130)
+    assert thunder_events(rig) == [] and kinds(rig, "steal") == []
+
+
+def test_a_song_changed_from_the_web_ui_reloads_the_song_map():
+    rig = Rig()
+    play_game(rig, "start")
+    seek(rig, 50)
+    rig.player.song_id, rig.player.map = 2, SongMap(None, [], [])
+    seek(rig, 1.0)
+    assert [(f["songId"], f["reason"]) for f in kinds(rig, "song_end")] == [("1", "skip")]
+    assert [f["songId"] for f in kinds(rig, "song_start")] == ["1", "2"]
+    assert playing_events(rig)[-1].song.id == 2 and playing_events(rig)[-1].song.section is None
+
+
+
+
+@pytest.mark.parametrize("t, flood, spot", [
+    (70.0, False, True),    # verse 1
+    (128.0, True, False),   # chorus 1
+    (136.0, False, False),  # instrumental
+    (250.0, False, False),  # outro
+])
+def test_section_scene_floodlights_in_choruses_spotlights_in_verses(t, flood, spot):
+    rig = Rig()
+    play_game(rig, "claps")  # duet
+    seek(rig, t)
+    assert rig.player.devices == {"floodLights (x2)": flood, "spotlights": spot, "smoke": False}
+
+
+def test_scene_matches_names_by_prefix_case_insensitively():
+    assert scene_for("chorus", ["FloodLights (x2)", "spotlights", "bubbles"]) == {"FloodLights (x2)": True, "spotlights": False}
+    assert scene_for(None, ["floodLights (x2)"]) == {"floodLights (x2)": False}
+
+
+@pytest.mark.parametrize("action, taps, game", [
+    ("claps", 2, "showoff"),
+    ("special", 3, "thunder"),
+    ("skip", 4, "fail"),     # over matchMaxCount
+    ("special", 5, "fail"),  # the action name alone ("special" = 3) would launch thunder
+])
+def test_launch_counts_the_real_taps_when_the_press_says_them(action, taps, game):
+    rig = Rig()
+    rig.press(action, "L", taps=taps)
+    rig.press(action, "R", ago=50, taps=taps)
+    rig.advance(500 + STEP)
+    (attempt,) = [f for kind, _, f in rig.log if kind == "launch_attempt"]
+    assert (attempt["countL"], attempt["countR"], attempt["result"]) == (taps, taps, game)
+
+
+def test_solo_glows_both_poles_pink_and_showoff_follows_the_turns():
+    rig = Rig()
+    rig.press("start", "R")
+    rig.advance(500 + 3000 + STEP)
+    p = playing_events(rig)[-1].poles
+    assert (p.L.mode, p.L.color, p.R.mode, p.R.color) == ("glow", "pink", "glow", "pink")
+
+    rig = Rig()
+    play_game(rig)
+    for t in (70, 100, 110):  # verse 1 (L), instrumental, verse 2 (R)
+        seek(rig, t)
+    assert [(e.poles.L.color, e.poles.R.color) for e in playing_events(rig)][-3:] == [
+        ("lime", None), ("pink", "pink"), (None, "blue")]
+
+
+@pytest.mark.parametrize("taps", [1, 2, 3])
+def test_solo_from_left_or_right_gives_the_same_show(taps):
+    """Solo is symmetric: only the launch fill (button feedback on the presser's own pole) and the
+    logged side differ; the intro, the song and every show event after it are identical."""
+    def run(side):
+        rig = Rig()
+        rig.player.map = SongMap.load(FIXTURE)
+        rig.press("start", side, taps=taps)
+        rig.advance(500 + 3000 + STEP)
+        for t in (70, 100, 110, 130, 260):
+            seek(rig, t)
+        shown = [e.model_dump(exclude={"timestamp"}) for _, e in rig.events if e.state != "launching"]
+        legacy = [e.model_dump(exclude={"timestamp"}) for _, e in rig.legacy]
+        return rig.director.game, shown, legacy
+
+    left, right = run("L"), run("R")
+    assert left[0] == "solo" and left == right
+
+
+def test_duet_poles_follow_the_singer_and_end_with_both():
+    rig = Rig()
+    rig.player.map = SongMap.load(FIXTURE)
+    rig.press("start", "L")
+    rig.press("start", "R", ago=50)
+    rig.advance(500 + 3000 + STEP)
+    assert rig.director.game == "duet"
+    for t in (70, 100, 110, 130, 260):  # verse 1, instrumental, verse 2, chorus, outro
+        seek(rig, t)
+    assert [(e.poles.L.color, e.poles.R.color) for e in playing_events(rig)][-5:] == [
+        ("lime", None), ("pink", "pink"), (None, "blue"), ("pink", "pink"), ("pink", "pink")]
+    assert all(e.turn is None for e in playing_events(rig))  # the perimeter stays the duet's
+
+
+@pytest.mark.parametrize("game, action", [("duet", "start"), ("showoff", "claps")])
+def test_a_change_of_singer_pulses_both_buttons_then_shows_the_new_colours(game, action):
+    rig = Rig()
+    rig.player.map = SongMap.load(FIXTURE)
+    rig.press(action, "L")
+    rig.press(action, "R", ago=50)
+    rig.advance(500 + 3000 + STEP)
+    assert rig.director.game == game
+    first = playing_events(rig)[0].buttons
+    assert (first.L, first.R, first.pulses) == ("pink", "pink", 0)  # song start: no handover
+    for t in (70, 100, 110):  # verse 1 (L), instrumental (both), verse 2 (R)
+        seek(rig, t)
+    got = [(e.buttons.L, e.buttons.R, e.buttons.pulses, e.buttons.pulse_ms) for e in playing_events(rig)[-3:]]
+    assert got == [("lime", None, 3, 1000), ("pink", "pink", 3, 1000), (None, "blue", 3, 1000)]
+
+
+def test_no_handover_pulse_without_a_change_of_singer():
+    rig = Rig()
+    play_game(rig, "start")  # solo: everyone sings, always
+    for t in (70, 100, 110):
+        seek(rig, t)
+    assert {(e.buttons.L, e.buttons.R, e.buttons.pulses) for e in playing_events(rig)} == {("pink", "pink", 0)}
+
+
+
+def cues(rig):
+    return [(e.cue, e.side) for _, e in rig.legacy if e.action == "cue"]
+
+
+def test_claps_announce_a_cue_before_the_sequence_runs():
+    rig = Rig()
+    play_solo(rig)
+    rig.press("claps", "R")
+    rig.press("special", "R")
+    assert cues(rig) == [("claps", "R")]  # special has no cue
+
+
+def play_thunder(rig=None):
+    rig = rig or Rig()
+    play_game(rig, "special")
+    return rig
+
+
+def wait(rig, ms):
+    """Song and clock run together, so thunder's time-based loop sees the real time."""
+    play_song(rig, round(rig.player.t + ms / 1000, 3))
+
+
+def cooldown():
+    return tunables.get("cooldownMs")
+
+
+def test_thunder_full_rise_takes_the_cooldown_setting_20_s():
+    assert tunables.defaults()["cooldownMs"] == 20000  # the user's number, set once in spec.json
+    rig = play_thunder()
+    start = rig.clock.t
+    wait(rig, cooldown())
+    ready = next(t for t, e in rig.events if e.thunder and e.thunder.phase == "ready")
+    assert ready - start == pytest.approx(20000, abs=STEP)
+    last = thunder_events(rig)[-1]
+    assert (last.thunder.performer, last.poles.L.pct, last.poles.R.pct, last.poles.R.mode) == ("L", 100, 100, "pulse")
+
+
+def test_thunder_rise_follows_the_cooldown_setting():
+    tunables.set_override("cooldownMs", 8000)
+    rig = play_thunder()
+    start = rig.clock.t
+    wait(rig, 9000)
+    ready = next(t for t, e in rig.events if e.thunder and e.thunder.phase == "ready")
+    assert ready - start == pytest.approx(8000, abs=STEP)
+
+
+def test_thunder_steal_swaps_roles_blacks_out_puffs_smoke_and_restarts_the_cooldown():
+    rig = play_thunder()
+    wait(rig, cooldown() + 1000)
+    assert rig.press("start", "R")["status"] == "ok"
+    wait(rig, 100)
+    assert rig.player.actions == ["special"]
+    assert thunder_events(rig)[-1].perimeter.look == "blackout"
+    wait(rig, 300)
+    after = thunder_events(rig)[-1]
+    assert (after.thunder.phase, after.thunder.performer, after.poles.R.pct, after.poles.R.color) == ("cooldown", "R", 100, "blue")
+    assert after.poles.L.color == "lime" and after.poles.L.pct < 5
+    assert [f["kind"] for f in kinds(rig, "press")] == ["steal"]
+    assert [(f["from"], f["to"]) for f in kinds(rig, "steal")] == [("L", "R")]
+    wait(rig, cooldown())
+    assert thunder_events(rig)[-1].thunder.phase == "ready"  # the cooldown ran again, for the left
+
+
+def test_thunder_early_and_performer_presses_are_ignored():
+    rig = play_thunder()
+    wait(rig, cooldown() // 4)
+    res = rig.press("start", "R")
+    assert (res["status"], res["reason"]) == ("ignored", "too_early")
+    assert rig.press("start", "L")["reason"] == "performer"
+    assert rig.player.actions == [] and kinds(rig, "steal") == []
+    assert [f["kind"] for f in kinds(rig, "press")] == ["early", "ordinary"]
+
+
+def test_thunder_claps_work_as_in_every_song():
+    rig = play_thunder()
+    rig.press("claps", "L")
+    assert cues(rig) == [("claps", "L")] and rig.player.actions == ["claps"]
+
+
+def test_thunder_steal_smoke_does_not_hold_up_the_show():
+    """The special sequence waits between its steps; the blackout and the restart must not wait for it."""
+    import time
+    rig = play_thunder()
+    wait(rig, cooldown() + 100)
+    started = []
+
+    async def slow(action):
+        started.append(action)
+        await asyncio.sleep(5)
+
+    rig.player.run_action = slow
+    rig.press("start", "R")
+    t0 = time.monotonic()
+    wait(rig, 1000)
+    assert time.monotonic() - t0 < 4 and started == ["special"]
+    assert thunder_events(rig)[-1].thunder.phase == "cooldown"

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pct, seekTargets, segments } from './timeline';
+import { pct, sectionOwner, seekTargets, segments } from './timeline';
 import type { SongMapInfo } from './timeline';
 
 const sec = (start: number, end: number, label: string) => ({ start, end, label, turn: 'both' as const, color: 'pink' });
@@ -34,5 +34,16 @@ describe('seekTargets', () => {
   it('has no next section at the end and never seeks before 0', () => {
     const t = seekTargets({ ...map, sections: [sec(0, 3, 'verse')], skip_cutoff_s: 2 }, 100, 5);
     expect(t).toEqual([{ label: 'Skip cutoff', to: 0 }]);
+  });
+});
+
+describe('sectionOwner', () => {
+  const s = { start: 0, end: 1, label: 'verse', turn: 'L' as const, color: 'lime', singer: 'R' as const, singer_color: 'blue' };
+  it('colours a section by the game running', () => {
+    expect(sectionOwner(s, 'showoff')).toEqual({ who: 'L', color: 'lime' });
+    expect(sectionOwner(s, 'duet')).toEqual({ who: 'R', color: 'blue' });
+    expect(sectionOwner(s, 'thunder')).toEqual({ who: 'both', color: 'white' }); // time-based, no section owner
+    expect(sectionOwner(s, 'solo')).toEqual({ who: 'both', color: 'pink' });
+    expect(sectionOwner(s, null)).toEqual({ who: 'both', color: 'pink' });
   });
 });

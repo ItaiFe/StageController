@@ -30,8 +30,10 @@ rsync -avz --delete \
     --exclude '.DS_Store' \
     backend/ "$TARGET:$REMOTE_DIR/backend/"
 
+# show-events.jsonl is the Pi's own night log; a laptop's (emulator) copy must never replace it
 rsync -avz \
     --exclude '.DS_Store' \
+    --exclude 'show-events.jsonl' \
     data/ "$TARGET:$REMOTE_DIR/data/"
 
 # Copy systemd service file

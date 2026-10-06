@@ -1,217 +1,162 @@
+/* One screen, no page scroll: the tab fills the viewport under the app's nav (the player bar is hidden
+   here, the song strip replaces it). Banner on top, the stage drawing (with each pillar's button, pole
+   and press chips inside it) as the hero, a dock (test presses + tabbed panes) on the right, the song
+   map at the bottom. Only the panes scroll. Layout: docs/superpowers/specs/2026-10-03-emulator-ui-redesign.md */
+.app:has(.stage-emulator) { height: 100vh; overflow: hidden; }
+.app:has(.stage-emulator) .main { min-height: 0; padding: 0.5rem 1rem; display: flex; flex-direction: column; }
+
 .stage-emulator {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
+  --pink: #FF1493; --lime: #7DFF00; --blueUi: #7AA2FF;
+  flex: 1; min-height: 0; display: grid; gap: 0.5rem;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) clamp(320px, 26vw, 400px);
+  grid-template-areas: "now now" "stage dock" "song song";
+  font-size: 13px; line-height: 1.35;
 }
+.stage-emulator kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--border); border-radius: 3px; padding: 0 3px; background: var(--bg-deep); }
+.emu-card { background: rgba(51, 34, 40, 0.6); border: 1px solid var(--border); border-radius: 12px; min-height: 0; }
 
-.emulator-header {
-  display: flex;
-  align-items: baseline;
-  gap: 1rem;
-  flex-wrap: wrap;
+/* Now banner */
+.emu-now { grid-area: now; display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.1fr) auto; gap: 0.4rem 1rem; align-items: center; padding: 0.4rem 0.75rem; background: rgba(255, 20, 147, 0.07); }
+.emu-now .pill { font: 800 13px/1 ui-monospace, monospace; letter-spacing: 0.06em; padding: 0.45rem 0.7rem; border-radius: 999px; border: 2px solid var(--c, var(--text-muted)); color: var(--c, var(--text-muted)); white-space: nowrap; }
+.emu-now .pill small { display: block; font: 600 10px/1.2 -apple-system, sans-serif; letter-spacing: 0; color: var(--text-muted); margin-top: 2px; text-align: center; }
+.emu-now .conn { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+.emu-now .conn.on { background: var(--success); box-shadow: 0 0 5px var(--success); }
+.emu-now .conn.off { background: var(--danger); }
+.now-text { min-width: 0; }
+.now-text b { font-size: 15px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.now-text .why { color: var(--text-muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.emu-now .next { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1px 0.5rem; font-size: 12px; min-width: 0; }
+.next .who { font-weight: 700; white-space: nowrap; }
+.next .who.L { color: var(--lime); }
+.next .who.R { color: var(--blueUi); }
+.next .what { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.next .what em { font-style: normal; color: #fff; font-weight: 700; background: var(--accent-dim); border-radius: 3px; padding: 0 3px; }
+.next .what s { color: var(--text-muted); }
+.emu-now .sound { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.emu-now .sound button { padding: 0.15rem 0.6rem; font-size: 12px; }
+.emu-now .sound .blocked { font-size: 10px; color: var(--danger); }
+
+/* Stage hero: the SVG fills the panel */
+.emu-stage { grid-area: stage; background: #050305; padding: 4px; display: flex; overflow: hidden; position: relative; }
+.emulator-tstage { flex: 1; width: 100%; height: 100%; min-height: 0; }
+.tstage-body { fill: #0a070a; stroke: #ff1493; stroke-opacity: 0.5; stroke-width: 3; stroke-dasharray: 2 9; stroke-linecap: round; }
+.emulator-tstage .zone { fill: #3a2a35; font: 700 18px sans-serif; letter-spacing: 0.2em; }
+.emulator-tstage .zone.small { font-size: 14px; }
+.emulator-tstage .led { fill: rgb(30, 22, 28); }
+.emulator-tstage .lane { fill: #8a7886; font: 600 15px sans-serif; }
+.emulator-tstage .onoff { font-size: 11px; font-weight: 800; }
+.emulator-tstage .lead { stroke: #4a3a45; stroke-width: 1.2; stroke-dasharray: 3 3; }
+.appl .fx { fill: #2a1f26; stroke: #6d5a67; stroke-width: 2; }
+.appl .beam { fill: #fff3c4; opacity: 0; }
+.appl .beam.cloud { fill: #d9d4dc; }
+.appl .beam.bubble { fill: none; stroke: #9be7ff; stroke-width: 2; }
+.appl.on .fx { fill: #fff3c4; stroke: #fff3c4; }
+.appl.on .beam { opacity: 0.16; }
+.appl.on .beam.cloud, .appl.on .beam.bubble { opacity: 0.6; }
+.appl.on .lane { fill: #fff3c4; }
+.appl.on .lead { stroke: #fff3c4; stroke-opacity: 0.5; }
+.emulator-tstage .seg { fill: #3a2a35; }
+.emulator-tstage .pole-bg { fill: #120a10; stroke: #8a7886; stroke-width: 2; }
+.emulator-tstage .pct { fill: #fff; font: 800 30px ui-monospace, monospace; }
+.emulator-tstage .puff { fill: #fff; }
+.pillar-btn { cursor: pointer; touch-action: none; user-select: none; outline: none; }
+.pillar-btn .cap { fill: #130d11; stroke: #ff6b8a; stroke-width: 3; }
+.pillar-btn.lit .cap { fill: #ffe9c8; stroke: #fff; }
+.pillar-btn.down .cap { fill: #ff6b8a; }
+.pillar-btn:focus-visible .cap { stroke: #fff; }
+.pillar-btn .hold { fill: none; stroke: #fff; stroke-width: 5; stroke-linecap: round; transform: rotate(-90deg); transform-box: fill-box; transform-origin: center; }
+.pillar-btn text { fill: #fff; font: 800 22px sans-serif; pointer-events: none; }
+.pillar-btn text.k { font: 600 12px sans-serif; fill: #b4a8b0; }
+.pillar-btn.lit text { fill: #000; }
+
+/* per-side cluster (foreignObject in the SVG: it scales with the pole it belongs to) */
+.side { height: 100%; display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--text); }
+.side.R { align-items: flex-end; text-align: right; }
+.side h4 { margin: 0; font-size: 15px; display: flex; gap: 6px; align-items: center; }
+.side.R h4 { flex-direction: row-reverse; }
+.side .role { font: 800 11px/1 sans-serif; letter-spacing: 0.05em; padding: 3px 6px; border-radius: 999px; background: var(--rc, #3a2a35); color: #000; }
+.side .role.dim { background: none; border: 1px solid #6d5a67; color: #8a7886; }
+.side .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.side.R .chips { justify-content: flex-end; }
+.side .chips button { font-size: 13px; padding: 2px 7px; }
+.side .hint { font-size: 12px; color: var(--text-muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 3px 10px; font-size: 12px; color: #b4a8b0; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
+.legend i.dim { background: #3a2a35; border: 1px solid #8a7886; }
+
+.emulator-badge {
+  position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
+  padding: 0.5rem 1.25rem; border-radius: 999px; background: rgba(255, 233, 200, 0.95); color: #1a1216;
+  font: 800 2rem sans-serif; pointer-events: none; animation: badge-pop 2s ease-out forwards;
 }
+@keyframes badge-pop { 0% { transform: translate(-50%, -50%) scale(0.6); } 10% { transform: translate(-50%, -50%) scale(1.1); } 20%, 80% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { opacity: 0; } }
 
-.emulator-header h2 {
-  margin: 0;
-  font-size: 1.5rem;
-  color: var(--accent);
-}
+/* emphasis: what makes sense now is bright, the rest dims; what the controller would ignore is struck */
+.stage-emulator button.hot { border-color: var(--accent); background: var(--accent-dim); color: #fff; font-weight: 700; box-shadow: 0 0 8px -2px var(--accent); }
+.stage-emulator button.dim { opacity: 0.35; }
+.stage-emulator button.no { opacity: 0.45; text-decoration: line-through; }
 
-.emulator-header p {
-  margin: 0;
-  font-size: 0.85rem;
-  color: var(--text-muted);
-}
-
-.emulator-conn {
-  font-size: 0.75rem;
-  padding: 0.15rem 0.5rem;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-}
-
-.emulator-conn.on { color: var(--success); }
-.emulator-conn.off { color: var(--danger); }
-
-.emulator-stage {
-  display: flex;
-  justify-content: center;
-  align-items: flex-end;
-  gap: 1.5rem;
-  background: #0d0a0b;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 1.25rem;
-}
-
-.emulator-tstage {
-  width: min(440px, 50%);
-  align-self: center;
-}
-
-.stage-part {
-  fill: #261a1f;
-  stroke: var(--border);
-  stroke-width: 2;
-  transition: fill 0.12s;
-}
-
-.stage-label {
-  fill: var(--text-muted);
-  font-size: 12px;
-}
-
-.emulator-pillar {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.emulator-pole {
-  width: 22px;
-  height: 260px;
-  border-radius: 6px;
-  box-shadow: 0 0 0 4px #1a1216;
-}
-
-.emulator-button {
-  width: 84px;
-  height: 84px;
-  border-radius: 50%;
-  border: 3px solid var(--accent);
-  background: radial-gradient(circle at 50% 50%, var(--accent-dim) calc(var(--hold, 0) * 100%), var(--bg-card) 0);
-  color: var(--text);
-  font-size: 1.25rem;
-  font-weight: 700;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  user-select: none;
-  touch-action: none;
-}
-
-.emulator-button small {
-  font-size: 0.65rem;
-  font-weight: 400;
-  color: var(--text-muted);
-}
-
-.emulator-button.pressed {
-  background: var(--accent);
-  color: var(--bg-deep);
-}
-
-.emulator-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 1rem;
-  align-items: start;
-}
-
-.emulator-card {
-  background: rgba(51, 34, 40, 0.6);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 1rem 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.emulator-card h3 {
-  margin: 0;
-  font-size: 1rem;
-}
-
-.emulator-macros,
-.emulator-devices {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.emulator-macros button.stop { border-color: var(--danger); color: var(--danger); }
-.emulator-devices button.on { background: var(--accent-dim); border-color: var(--accent); }
-
-.emulator-note {
-  margin: 0;
-  font-size: 0.8rem;
-  color: var(--text-muted);
-}
-
-.emulator-status {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.3rem 1rem;
-  margin: 0;
-  font-size: 0.9rem;
-}
-
+/* dock: test presses + tabbed panes */
+.emu-dock { grid-area: dock; display: grid; grid-template-rows: auto minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); gap: 0.5rem; min-height: 0; }
+.emu-press { padding: 0.45rem 0.6rem; display: flex; flex-direction: column; gap: 0.3rem; overflow: auto; }
+.emu-press h3 { margin: 0.1rem 0 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); display: flex; justify-content: space-between; }
+.emu-press h3 span { text-transform: none; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.emu-press h3 { gap: 0.5rem; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.emu-press button { font-size: 12px; padding: 3px 4px; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.emu-press button small { display: block; font-size: 10px; color: var(--text-muted); font-weight: 400; }
+.emulator-both { touch-action: none; user-select: none; }
+.emulator-both.pressed { background: var(--accent); color: #fff; }
+.emu-panes { display: flex; flex-direction: column; padding: 0.35rem 0.6rem; min-width: 0; }
+.emu-panes .tabs { display: flex; gap: 3px; margin-bottom: 0.3rem; }
+.emu-panes .tabs button { font-size: 12px; padding: 2px 6px; white-space: nowrap; }
+.emu-panes .tabs button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.emu-panes .emulator-clear { margin-left: auto; }
+.emu-pane { flex: 1; min-height: 0; overflow-y: auto; }
+.emu-pane[hidden] { display: none; }
+.emu-pane .light-rules { margin: 0; }
+.feed { list-style: none; margin: 0; padding: 0; font-size: 12px; }
+.feed li { padding: 4px 0; border-bottom: 1px solid #3a2433; }
+.feed .t { font: 11px ui-monospace, monospace; color: var(--text-muted); margin-right: 5px; }
+.feed .s { font-weight: 800; margin-right: 4px; }
+.feed .s.L { color: var(--lime); }
+.feed .s.R { color: var(--blueUi); }
+.feed .reply { display: block; padding-left: 1.2rem; color: #c9b8be; }
+.feed .reply.ign { color: #ffb38a; }
+.feed li.new { animation: feed-flash 1.2s; }
+@keyframes feed-flash { from { background: var(--accent-dim); } to { background: none; } }
+.emulator-log { list-style: none; margin: 0; padding: 0; font: 11px/1.5 ui-monospace, monospace; }
+.emulator-log li span { color: var(--text-muted); margin-right: 0.6rem; }
+.emulator-status { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 0 0 6px; }
 .emulator-status dt { color: var(--text-muted); }
 .emulator-status dd { margin: 0; }
+.emulator-devices { display: flex; flex-wrap: wrap; gap: 4px; }
+.emulator-devices button.on { background: var(--accent-dim); border-color: var(--accent); }
+.emulator-note { margin: 0; font-size: 12px; color: var(--text-muted); }
 
-.emulator-log-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
+/* song map */
+.emu-song { grid-area: song; padding: 0.35rem 0.75rem 0.45rem; display: flex; flex-direction: column; gap: 4px; }
+.song-head { display: flex; gap: 0.6rem; align-items: center; font-size: 12px; white-space: nowrap; overflow: hidden; }
+.song-head .title { font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
+.song-head .seek { display: flex; gap: 4px; margin-left: auto; }
+.song-head .seek button { font-size: 11px; padding: 1px 6px; }
+.song-head .time { font: 700 13px ui-monospace, monospace; min-width: 9.5em; text-align: right; margin-left: auto; }
+.song-head .seek + .time { margin-left: 0; }
+.bar { position: relative; height: 30px; border: 1px solid var(--border); border-radius: 6px; background: #0d0a0b; cursor: pointer; }
+.sec { position: absolute; top: 0; bottom: 0; border-right: 1px solid #0d0a0b; color: #000; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; overflow: hidden; white-space: nowrap; opacity: 0.5; }
+.sec.cur { opacity: 1; box-shadow: inset 0 0 0 2px #fff; }
+.sec.past { opacity: 0.3; }
+.cut { position: absolute; top: -5px; bottom: -5px; border-left: 2px dashed var(--danger); z-index: 2; pointer-events: none; }
+.cut::after { content: 'skip ✕ after'; position: absolute; top: -1px; left: 3px; font-size: 9px; color: var(--danger); white-space: nowrap; background: #0d0a0b; padding: 0 2px; border-radius: 2px; }
+.ph { position: absolute; top: -6px; bottom: -6px; width: 3px; margin-left: -1px; background: #fff; box-shadow: 0 0 6px #fff; pointer-events: none; z-index: 3; }
+.song-empty { height: 30px; border: 1px dashed var(--border); border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 12px; }
 
-.emulator-log {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  max-height: 14rem;
-  overflow-y: auto;
-  font-size: 0.8rem;
-  font-family: ui-monospace, monospace;
-}
-
-.emulator-log li span {
-  color: var(--text-muted);
-  margin-right: 0.6rem;
-}
-
-.timeline-bar {
-  position: relative;
-  height: 2.2rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: #0d0a0b;
-  cursor: pointer;
-}
-
-.timeline-section {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  opacity: 0.55;
-  border-right: 1px solid #0d0a0b;
-  color: #000;
-  font-size: 0.75rem;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-
-.timeline-cutoff {
-  position: absolute;
-  top: -4px;
-  bottom: -4px;
-  width: 0;
-  border-left: 2px dashed var(--danger);
-  pointer-events: none;
-}
-
-.timeline-playhead {
-  position: absolute;
-  top: -4px;
-  bottom: -4px;
-  width: 2px;
-  background: #fff;
-  pointer-events: none;
+/* wide screens: the dock splits into two columns (presses | panes). Must come after .emu-dock above. */
+@media (min-width: 1800px) {
+  .stage-emulator { grid-template-columns: minmax(0, 1fr) 330px minmax(400px, 24vw); grid-template-areas: "now now now" "stage press panes" "song song song"; }
+  .emu-dock { display: contents; }
+  .emu-press { grid-area: press; }
+  .emu-panes { grid-area: panes; }
 }

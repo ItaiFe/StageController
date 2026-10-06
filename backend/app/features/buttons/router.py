@@ -28,6 +28,9 @@ class ButtonPress(BaseModel):
     # absent = the legacy single-button path
     side: Literal["L", "R"] | None = None
     first_press_ago_ms: int = Field(default=0, ge=0)
+    # The gesture's real tap count, when the sender knows it: the action name alone is lossy
+    # (4 taps = skip, 5+ = special = 3), so the launch rule would read 4+4 or 5+5 wrong
+    taps: int | None = Field(default=None, ge=1)
 
 
 class ButtonEvent(BaseModel):
@@ -41,19 +44,26 @@ class ButtonEvent(BaseModel):
 class ConnectionManager:
     def __init__(self):
         self.active_connections: list[WebSocket] = []
-        self.last_events: list[BaseModel] = []
+        self.last_events: list[ButtonEvent] = []
+        self.last_show: BaseModel | None = None
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
+        # show events are sent on changes only: a client joining mid-song would think the show is idle
+        if self.last_show is not None:
+            await websocket.send_json(self.last_show.model_dump(mode="json"))
 
     def disconnect(self, websocket: WebSocket):
         self.active_connections.remove(websocket)
 
     async def broadcast(self, event: BaseModel):
-        self.last_events.append(event)
-        if len(self.last_events) > 100:
-            self.last_events = self.last_events[-100:]
+        if isinstance(event, ButtonEvent):  # /recent stays button presses only, not show frames
+            self.last_events.append(event)
+            if len(self.last_events) > 100:
+                self.last_events = self.last_events[-100:]
+        elif getattr(event, "action", None) == "show":  # not cues: a late client needs the state only
+            self.last_show = event
 
         disconnected = []
         for connection in self.active_connections:
@@ -265,7 +275,7 @@ async def button_press(data: ButtonPress, db: Session = Depends(get_db)):
     """Receive a button press from external device (Pi GPIO, remote, etc.)"""
     if data.side:
         from app.features.show.service import director
-        return await director.on_press(data.action, data.side, data.first_press_ago_ms)
+        return await director.on_press(data.action, data.side, data.first_press_ago_ms, data.taps)
 
     if not is_action_allowed(data.action, show_is_running()):
         return ignored_response(data.action)

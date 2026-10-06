@@ -4,7 +4,6 @@ Pure: no player or DB, and time is always an argument. A song without usable sec
 a SongMap (`has_markers` False): every question then answers from the spec's fallback tunables.
 """
 import json
-from bisect import bisect_left, bisect_right
 from pathlib import Path
 
 from . import tunables
@@ -29,7 +28,7 @@ class SongMap:
             data = json.loads(Path(path).read_text())
             tempo = data.get("tempo") or {}
             return cls(tempo.get("bpm"), tempo.get("beats") or [], data.get("sections") or [])
-        except (OSError, ValueError, AttributeError):
+        except (OSError, ValueError, AttributeError, KeyError, TypeError):
             return cls(None, [], [])
 
     @property
@@ -64,11 +63,12 @@ class SongMap:
             return "both"
         return "L" if self._verses.index(current) % 2 == 0 else "R"
 
-    def beat_at(self, t: float) -> int:
-        """Index of the last beat at or before t; -1 before the first."""
-        return bisect_right(self.beats, t) - 1
+    def singer(self, t: float, duration: float = 0.0) -> str:
+        """Duet (and thunder before a steal): who sings this section. The sidecar may say so per section
+        (optional `turn`: L | R | both, hand-tagged; the analyzer does not detect voices); untagged
+        sections fall back to the showoff alternation. A duet ends with both: the last section is both."""
+        current = next((s for s in self.sections if t < s["end"]), self.sections[-1]) if self.sections else None
+        if current is not None and current is not self.sections[-1] and current.get("turn") in ("L", "R", "both"):
+            return current["turn"]
+        return self.turn_owner(t, duration)
 
-    def beat_after(self, t: float) -> float | None:
-        """Time of the first beat at or after t."""
-        i = bisect_left(self.beats, t)
-        return self.beats[i] if i < len(self.beats) else None

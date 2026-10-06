@@ -17,5 +17,5 @@ def is_action_allowed(action: str, show_running: bool) -> bool:
 IDLE_TAPS = {"start": 1, "claps": 2, "special": 3, "skip": 4}
 
 # In-song meaning of each action (side-aware presses while a game is playing). "tap" is the
-# plain single press, reserved for thunder tags; everything else is today's behaviour.
+# plain single press, used for thunder steals; everything else is today's behaviour.
 IN_SONG = {"start": "tap", "claps": "claps", "special": "special", "skip": "skip", "stop": "stop"}

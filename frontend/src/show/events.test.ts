@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { describeEvent, paletteRgb, polePixels, slotWithoutShow } from './events';
-import type { Pole, ShowEvent, ShowSpec } from './events';
+import { buttonRings, cueView, describeEvent, paletteRgb, polePixels, slotWithoutShow } from './events';
+import type { ButtonLights, Pole, ShowEvent, ShowSpec } from './events';
 
 const spec: ShowSpec = { palette: { pink: { ramp: [[1, 2, 3], [255, 20, 147], [9, 9, 9]] } }, games: [] };
 const pink: [number, number, number] = [255, 20, 147];
@@ -40,6 +40,13 @@ describe('polePixels', () => {
     expect(lit(polePixels(pole({ mode: 'blink' }), pink, 300))).toBe(0);
     expect(lit(polePixels(pole({ mode: 'pulse' }), pink, 123))).toBe(50);
   });
+
+  it('pulses at the period the event gives', () => {
+    const red = (ms: number | null, at: number) => polePixels(pole({ mode: 'pulse', ms }), pink, at)[0];
+    expect(red(290, 290 / 2)).toBe(255); // a full fade: brightest half a period in
+    expect(red(290, 0)).toBeLessThan(40); // and nearly dark at the start of each cycle
+    expect(red(null, 290 / 2)).not.toBe(255);
+  });
 });
 
 describe('slotWithoutShow', () => {
@@ -59,5 +66,41 @@ describe('describeEvent', () => {
     expect(describeEvent({ action: 'claps' })).toBe('button claps');
     const playing = { action: 'show', state: 'playing', game: 'showoff', step: null, poles: e.poles, turn: 'R', song: { id: 1, section: 'verse', section_index: 2, t: 105 } };
     expect(describeEvent(playing)).toBe('playing · showoff · verse 2 · turn R · L 100% R 100%');
+    const thunder = { ...playing, game: 'thunder', turn: null, thunder: { phase: 'cooldown', performer: 'L', pct: 40 } };
+    expect(describeEvent(thunder)).toBe('playing · thunder · verse 2 · thunder cooldown · L performs · 40% · L 100% R 100%');
+  });
+});
+
+describe('cueView', () => {
+  it('maps a claps cue to the badge and a feed line', () => {
+    const c = { action: 'cue', timestamp: '', cue: 'claps', side: 'R' } as const;
+    expect(cueView(c)).toEqual({ badge: '👏 CLAPS', line: 'claps triggered (right pillar): 2 taps in the song → claps sequence running, applause sound' });
+  });
+});
+
+describe('buttonRings', () => {
+  const b = (L: string | null, R: string | null, pulses = 0): ButtonLights => ({ L, R, pulses, pulse_ms: pulses ? 1000 : 0 });
+
+  it.each([
+    ['left sings', b('lime', null), { L: { name: 'lime', a: 1 }, R: null }],
+    ['right sings', b(null, 'blue'), { L: null, R: { name: 'blue', a: 1 } }],
+    ['both sing', b('pink', 'pink'), { L: { name: 'pink', a: 1 }, R: { name: 'pink', a: 1 } }],
+  ])('%s: the singer side in its colour, the other dim', (_, lights, want) => {
+    expect(buttonRings(lights)).toEqual(want);
+  });
+
+  it('a handover pulses both rings together, ease in/out, then settles on the new colours', () => {
+    const h = b(null, 'blue', 3);
+    const at = (s: number) => buttonRings(h, { buttons: h, sinceS: s });
+    expect(at(0).L?.a).toBeCloseTo(0);
+    const peak = at(1 / 6); // the middle of the first of 3 pulses over 1 s
+    expect([peak.L?.a, peak.R?.a]).toEqual([1, 1]);
+    expect([peak.L?.name, peak.R?.name]).toEqual(['white', 'blue']); // the dim side pulses white
+    expect(at(1 / 3).R?.a).toBeCloseTo(0);
+    expect(at(1.01)).toEqual({ L: null, R: { name: 'blue', a: 1 } });
+  });
+
+  it('no event buttons: no rings', () => {
+    expect(buttonRings(undefined)).toEqual({ L: null, R: null });
   });
 });

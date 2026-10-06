@@ -386,12 +386,12 @@ export interface PressResult {
 
 export const buttonsApi = {
   /** With `side`, the press goes to the show director like a pillar's (docs/show-events-contract.md). */
-  press: async (action: ButtonAction, side?: { side: 'L' | 'R'; firstPressAgoMs: number }): Promise<PressResult> => {
+  press: async (action: ButtonAction, side?: { side: 'L' | 'R'; firstPressAgoMs: number; taps?: number | null }): Promise<PressResult> => {
     const res = side
       ? await fetch(`${API_BASE}/buttons/press`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action, side: side.side, first_press_ago_ms: side.firstPressAgoMs }),
+          body: JSON.stringify({ action, side: side.side, first_press_ago_ms: side.firstPressAgoMs, taps: side.taps ?? undefined }),
         })
       : await fetch(`${API_BASE}/buttons/press/${action}`, { method: 'POST' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);

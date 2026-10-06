@@ -5,8 +5,20 @@ export interface SongMapSection {
   end: number;
   label: string;
   index?: number;
-  turn: 'L' | 'R' | 'both';
+  turn: 'L' | 'R' | 'both'; // showoff's alternation
   color: string; // palette name
+  singer?: 'L' | 'R' | 'both'; // duet: a hand-tagged sidecar turn, else the alternation
+  singer_color?: string;
+}
+
+/** Whose section it is and its colour, for the game running: showoff = the turn, duet = the singer,
+ * solo (and no game) = everyone together, pink; thunder = nobody's (its steal loop is time-based, not
+ * per section), white. */
+export function sectionOwner(s: SongMapSection, game: string | null | undefined): { who: 'L' | 'R' | 'both'; color: string } {
+  if (game === 'showoff') return { who: s.turn, color: s.color };
+  if (game === 'duet') return { who: s.singer ?? s.turn, color: s.singer_color ?? s.color };
+  if (game === 'thunder') return { who: 'both', color: 'white' };
+  return { who: 'both', color: 'pink' };
 }
 
 export interface SongMapInfo {
@@ -32,3 +44,4 @@ export function seekTargets(map: SongMapInfo, now: number, leadS: number) {
   if (verse2) targets.push({ label: 'Verse 2 end', to: verse2.end - leadS });
   return targets.map(t => ({ ...t, to: Math.max(0, t.to) }));
 }
+
